@@ -1,0 +1,8 @@
+*.pyc
+*~
+.DS_Store
+.eggs
+.idea
+.tox
+env
+mqtt2cmd.egg-info

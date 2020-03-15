@@ -1,0 +1,11 @@
+[Unit]
+Description=MQTT based command dispatcher
+
+[Service]
+User=ff
+Type=simple
+ExecStart=/home/ff/mqtt2cmd.git/mqtt2cmd/bin/start_mqtt2cmd.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
