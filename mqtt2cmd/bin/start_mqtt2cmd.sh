@@ -11,6 +11,6 @@ TOP_DIR="${PROG_DIR%/*}"
 cd ${TOP_DIR}/env
 source ./bin/activate
 export PYTHONPATH=${PYTHONPATH:-$TOP_DIR}
-cd ${PROG_DIR} && ./main.py
+cd ${PROG_DIR} && ./main.py $@
 
 exit 0

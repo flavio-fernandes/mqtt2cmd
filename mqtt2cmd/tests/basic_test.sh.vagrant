@@ -1,0 +1,115 @@
+#!/bin/bash
+
+# basic.... very very basic test
+#set -o xtrace
+set -o errexit
+
+MQTT_BROKER='192.168.123.123'
+TMP_OUTPUT=/tmp/basic_test.tmp
+
+get_log_lines () {
+  NUM_LINES=${1:-3}
+  sleep 1.2  ; # give it a sec or 2 to finish...
+  sudo journalctl -u mqtt2cmd.service --no-pager --lines=${NUM_LINES} --output=cat > ${TMP_OUTPUT}
+}
+
+echo TEST: default handler. Used when we do need to match on a particular payload
+mosquitto_pub -h ${MQTT_BROKER} -t /foo/bar -m "testing default handler"
+get_log_lines
+grep --quiet -E 'received t: /foo/bar p: testing default handler h: handle_bar_default' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_bar_default finished with rc 0' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: job using other job
+mosquitto_pub -h ${MQTT_BROKER} -t /foo/bar -m ola
+get_log_lines 5
+grep --quiet -E 'greetings from 3 t: /foo/bar p: ola h: handle_bar_ola1' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_bar_ola1 output .+good bye' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_bar_ola1 finished with rc 0' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_bar_ola1 output .+the topic is /foo/bar' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: job that publishes, causing another job to happen
+mosquitto_pub -h ${MQTT_BROKER} -t /foo/bar -m hi
+get_log_lines 7
+grep --quiet -E 'greetings from los tres amigos t: /foo/bar p: ola from hi h: handle_bar_ola2' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_bar_ola2 output .+good bye' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_bar_ola2 finished with rc 0' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+# this must ot have "the topic" in output
+grep --quiet -E 'the topic is ' ${TMP_OUTPUT} && { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: /foo/ping for Carlos Santana
+mosquitto_pub -h ${MQTT_BROKER} -t /foo/ping -m ''
+get_log_lines
+grep --quiet -E 'job [0-9]+ handle handle_foofoo output .+Carlos Santana is a hero' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_foofoo finished with rc 0' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: /foo/ping for Eric Clapton
+mosquitto_pub -h ${MQTT_BROKER} -t /foo/ping -m 'eric'
+get_log_lines
+grep --quiet -E 'job [0-9]+ handle handle_foofoo output .+Eric Clapton is a hero' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_foofoo output .+Carlos Santana is a hero' ${TMP_OUTPUT} && \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'job [0-9]+ handle handle_foofoo finished with rc 0' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: parallel
+PAYLOAD='{"p":"0x0200000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}'
+mosquitto_pub -h ${MQTT_BROKER} -t /buttonbox/buttons -m ${PAYLOAD}
+sleep 5 ; # wait for it...
+get_log_lines 5
+grep --quiet -E 'hello from button57 with payload.p == 0x0200000000000000' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'done handling job [0-9]+ handle button57 finished with rc 0' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: failure case: timeout
+PAYLOAD='{"p":"0x0100000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}'
+mosquitto_pub -h ${MQTT_BROKER} -t /buttonbox/buttons -m ${PAYLOAD}
+sleep 5 ; # wait for it...
+get_log_lines
+grep --quiet -E 'WARNING +job [0-9]+ handle button56 timed out' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'done handling job [0-9]+ handle button56 finished with rc -9' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: failure case: stop on failure
+mosquitto_pub -h ${MQTT_BROKER} -t /buttonbox/buttons -m test_stop_on_failure
+get_log_lines 5
+grep --quiet -E 'output .+testing checkpoint1' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'output .+testing checkpoint2' ${TMP_OUTPUT} && { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'cannot access /321boom123/boom/boom/boom' ${TMP_OUTPUT} || \
+  { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'finished with rc 0' ${TMP_OUTPUT} && { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: failure case: continue on failure
+mosquitto_pub -h ${MQTT_BROKER} -t /buttonbox/buttons -m test_continue_on_failure
+get_log_lines 8
+grep --quiet -E 'output .+testing checkpoint0' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'output .+testing checkpoint1' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'output .+testing checkpoint2' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'output .+testing checkpoint3' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'finished with rc 0' ${TMP_OUTPUT} && { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo TEST: failure case: parallel
+mosquitto_pub -h ${MQTT_BROKER} -t /buttonbox/buttons -m test_parallel_failure
+get_log_lines 8
+grep --quiet -E 'output .+testing checkpoint0' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'output .+testing checkpoint1' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'output .+testing checkpoint2' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'output .+testing checkpoint3' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+grep --quiet -E 'finished with rc 0' ${TMP_OUTPUT} && { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
+
+echo 'PASSED: Happy happy, joy joy!'
+rm -f ${TMP_OUTPUT}
+exit 0

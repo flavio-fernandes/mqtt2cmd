@@ -1,5 +1,6 @@
 *.pyc
 *~
+.vagrant
 .DS_Store
 .eggs
 .idea

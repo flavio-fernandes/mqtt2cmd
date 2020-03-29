@@ -2,9 +2,9 @@
 Description=MQTT based command dispatcher
 
 [Service]
-User=ff
+User=vagrant
 Type=simple
-ExecStart=/home/ff/mqtt2cmd.git/mqtt2cmd/bin/start_mqtt2cmd.sh
+ExecStart=/vagrant/mqtt2cmd/bin/start_mqtt2cmd.sh /home/vagrant/mqtt2cmd.config.yaml
 Restart=on-failure
 
 [Install]

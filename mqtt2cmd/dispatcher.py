@@ -6,7 +6,7 @@ import multiprocessing
 import signal
 import sys
 from collections import namedtuple
-from typing import Dict
+from flashtext import KeywordProcessor
 
 import dill
 from shelljob import proc
@@ -20,18 +20,19 @@ from mqtt2cmd.config import Cfg
 CMDQ_SIZE = 100
 CMDQ_GET_TIMEOUT = 3600  # seconds.
 MAX_CONCURRENT_JOBS = 128
+MAX_NESTED_LOOKUPS = 20
 _state = None
 
 
 class State(object):
-    def __init__(self, queueEventFun, globals, topics, handlers):
-        self.queueEventFun = queueEventFun  # queue for output events
+    def __init__(self, queue_event_fun, cfg_globals, topics, handlers):
+        self.queueEventFun = queue_event_fun  # queue for output events
         self.cmdq = multiprocessing.Queue(CMDQ_SIZE)  # queue for input commands
-        self.globals = globals
+        self.cfg_globals = cfg_globals
         self.topics = topics
         self.handlers = handlers
-        self.next_job_id: int = 1
-        self.curr_jobs: Dict[int, Job] = {}
+        self.next_job_id = 1
+        self.curr_jobs = {}
 
 
 # =============================================================================
@@ -42,24 +43,24 @@ def do_init(queueEventFun=None):
     global _state
 
     cfg = Cfg()
-    globals = cfg.globals
-    assert isinstance(globals, dict)
+    cfg_globals = cfg.cfg_globals
+    assert isinstance(cfg_globals, dict)
     topics = cfg.topics
     assert isinstance(topics, dict)
     handlers = cfg.handlers
     assert isinstance(handlers, dict)
 
-    _state = State(queueEventFun, globals, topics, handlers)
+    _state = State(queueEventFun, cfg_globals, topics, handlers)
     # logger.debug("dispatcher init called")
 
 
 # =============================================================================
 
-ShellJobInfo = namedtuple('ShellJobInfo', 'grp timeout stop_on_failure in_sequence')
+ShellJobInfo = namedtuple('ShellJobInfo', 'grp timeout stop_on_failure in_sequence log_output')
 
 
 class Job(dict):
-    def __init__(self, job_id, topic, payload, handler, attrs, vars, globals, commands):
+    def __init__(self, job_id, topic, payload, handler, attrs, vars, cfg_globals, commands):
         self.job_id = job_id
         self.create_ts = datetime.datetime.now().strftime("%I:%M:%S%p on %B %d, %Y")
         self.topic = topic
@@ -67,17 +68,27 @@ class Job(dict):
         self.handler = handler
         # make payload and attrs part of 'self'
         self._parse_payload(payload)
-        # globals overwrite payload
-        self.__dict__.update(globals)
-        # vars overwrite globals
+        # cfg_globals overwrite payload
+        self.__dict__.update(cfg_globals)
+        # vars overwrite cfg_globals
         self.__dict__.update(vars)
         # attrs overwrite vars
         self.__dict__.update(attrs)
+
+        # ref: https://flashtext.readthedocs.io/en/latest/#
+        keyword_processor = KeywordProcessor(case_sensitive=True)
+        keyword_processor.set_non_word_boundaries(set(['~']))
+        for k, v in self.__dict__.items():
+            keyword_processor.add_keyword(
+                "{}{}{}".format(const.CONFIG_VARIABLE_PREFIX, k, const.CONFIG_VARIABLE_SUFFIX),
+                str(v))
+
         try:
-            self.commands = [self._expand_cmd(c) for c in commands]
+            self.commands = [self._replace_keywords(keyword_processor, c, 0) for c in commands]
         except ValueError as e:
             logger.error(e)
             self.commands = []
+
         self.shell_job_info = None
         self.shell_job_info_cmds = []
         self.shell_job_info_proc_handles = []
@@ -97,38 +108,22 @@ class Job(dict):
         try:
             json_object = json.loads(payload)
         except ValueError as e:
-            logger.debug("dispatcher not looking into payload {}".format(e))
+            logger.debug("not looking into payload {}".format(e))
             return
         if isinstance(json_object, dict):
             self.__dict__.update(json_object)
 
-    def _expand_cmd(self, cmd):
-        rc, unknowns = self._expand_cmd2(cmd.split(), [], [])
-        if unknowns:
+    def _replace_keywords(self, keyword_processor, cmd, depth: int):
+        cmd2 = keyword_processor.replace_keywords(cmd)
+        if cmd != cmd2:
+            if depth <= MAX_NESTED_LOOKUPS:
+                return self._replace_keywords(keyword_processor, cmd2, depth + 1)
+            # Likely a circular dependency issue?!?
             logger.error(
-                "payload {} msg {} unable to find a value for '{}' in command '{}'".format(
-                    self.payload, self.handler, ','.join(unknowns), cmd))
-            # logger.error("failed parsing command for job {}".format(self))
-            # return ''
-            raise ValueError('failed parsing command for job', self)
-        return ' '.join(rc)
-
-    def _expand_cmd2(self, params: str, rc: list, unknowns: list):
-        if not params:
-            return rc, unknowns
-        param = params[0]
-        if param.startswith(const.CONFIG_VARIABLE_PREFIX) and param.endswith(
-                const.CONFIG_VARIABLE_SUFFIX) and len(param) > len(
-            const.CONFIG_VARIABLE_PREFIX + const.CONFIG_VARIABLE_SUFFIX):
-            var_name = param[len(const.CONFIG_VARIABLE_PREFIX):]
-            var_name = var_name[:len(var_name) - len(const.CONFIG_VARIABLE_SUFFIX)]
-            if var_name in self.__dict__:
-                rc.append(str(self.__dict__[var_name]))
-            else:
-                unknowns.append(param)
-        else:
-            rc.append(param)
-        return self._expand_cmd2(params[1:], rc, unknowns)
+                "payload {} msg {} too many recursions to extract value for {}".format(
+                    self.payload, self.handler, cmd))
+            raise ValueError('failed nested lookup variables for job', self)
+        return cmd
 
 
 def _do_handle_dispatch(topic, payload):
@@ -137,15 +132,21 @@ def _do_handle_dispatch(topic, payload):
     # find msg for topic and payload tuple
     topicPayloads = _state.topics.get(topic, {})
     handler = topicPayloads.get(payload) or topicPayloads.get(const.CONFIG_DEFAULT_PAYLOAD)
-    job = _state.handlers.get(handler, {})
-    attrs = job.get(const.CONFIG_ATTRS, {})
-    vars = job.get(const.CONFIG_VARS, {})
-    commands = job.get(const.CONFIG_CMDS, [])
+    handler_job = _state.handlers.get(handler, {})
+    attrs = handler_job.get(const.CONFIG_ATTRS, {})
+    vars = handler_job.get(const.CONFIG_VARS, {})
+    commands = handler_job.get(const.CONFIG_CMDS, [])
 
-    job = Job(_state.next_job_id, topic, payload, handler, attrs, vars, _state.globals, commands)
+    job = Job(_state.next_job_id, topic, payload, handler, attrs, vars, _state.cfg_globals,
+              commands)
+
     _state.next_job_id += 1
+    if _state.next_job_id > 0xffff:
+        logger.info("wrapping next_job_id from {} to 1".format(_state.next_job_id))
+        _state.next_job_id = 1
+
     if not job.commands:
-        logger.debug("dispatcher ignoring noop job {}".format(job))
+        logger.debug("ignoring noop job {}".format(job))
         return
 
     jobs_count = len(_state.curr_jobs)
@@ -153,8 +154,6 @@ def _do_handle_dispatch(topic, payload):
         logger.error("too many jobs: {}. dispatcher unable to start job {})".format(
             jobs_count, job))
         return
-
-    logger.info("dispatcher starting on job {} (curr total jobs: {})".format(job, jobs_count + 1))
 
     now = datetime.datetime.now()
     timeout_param = int(job.get(const.CONFIG_TIMEOUT, const.CONFIG_TIMEOUT_DEFAULT_SECS))
@@ -165,6 +164,22 @@ def _do_handle_dispatch(topic, payload):
 
     stop_on_failure = job.get(const.CONFIG_STOP, const.CONFIG_STOP_DEFAULT)
     in_sequence = job.get(const.CONFIG_IN_SEQ, const.CONFIG_IN_SEQ_DEFAULT)
+    log_output = job.get(const.CONFIG_LOG_CMD_OUTPUT, const.CONFIG_LOG_CMD_OUTPUT_DEFAULT)
+
+    logger.debug("starting job {})".format(job))
+
+    job_params_info = ''
+    if stop_on_failure != const.CONFIG_STOP_DEFAULT:
+        job_params_info += ' stop_on_failure: {}'.format(stop_on_failure)
+    if in_sequence != const.CONFIG_IN_SEQ_DEFAULT:
+        job_params_info += ' in_sequence: {}'.format(in_sequence)
+    if timeout_param != const.CONFIG_TIMEOUT_DEFAULT_SECS:
+        job_params_info += ' timeout: {}'.format(timeout)
+    if log_output != const.CONFIG_LOG_CMD_OUTPUT_DEFAULT:
+        job_params_info += ' log_output: {}'.format(log_output)
+
+    logger.info("starting job: {} handler: {} cmds: {}{} (curr total jobs: {})".format(
+        job.job_id, job.handler, job.commands, job_params_info, jobs_count + 1))
 
     grp = proc.Group()
     job.shell_job_info_cmds = [c for c in job.commands]
@@ -183,7 +198,7 @@ def _do_handle_dispatch(topic, payload):
         if in_sequence:
             break
 
-    job.shell_job_info = ShellJobInfo(grp, timeout, stop_on_failure, in_sequence)
+    job.shell_job_info = ShellJobInfo(grp, timeout, stop_on_failure, in_sequence, log_output)
     _state.curr_jobs[job.job_id] = job
     _enqueue_cmd((_noop, []))
 
@@ -193,7 +208,7 @@ def _noop():
 
 
 def _notifyDispatcherHandlerDoneEvent(msg):
-    logger.info("dispatcher done handling %s", msg)
+    logger.info("done handling %s", msg)
     _notifyEvent(events.DispatcherHandlerDoneEvent(msg))
 
 
@@ -213,42 +228,56 @@ def _check_curr_jobs():
     if jobs_finished:
         for job_id in jobs_finished:
             del _state.curr_jobs[job_id]
-        logger.debug("dispatcher finished with jobs {} (curr total jobs: {})".format(
+        logger.debug("finished with jobs {} (curr total jobs: {})".format(
             jobs_finished, len(_state.curr_jobs)))
+
+
+def _log_shell_job_output(job):
+    shi = job.shell_job_info
+    lines = shi.grp.readlines(timeout=0.2)
+    for _proc, line in lines:
+        logger.debug("job %s handle %s output %s", job.job_id, job.handler, line)
+        if shi.log_output:
+            logger.info("job %s handle %s output %s", job.job_id, job.handler, line)
 
 
 def _check_job(job_id):
     global _state
 
-    job: Job = _state.curr_jobs[job_id]
-    shi: ShellJobInfo = job.shell_job_info
-    if not shi.grp.is_pending():
-        lines = shi.grp.readlines(timeout=0.5)
-        for _proc, line in lines:
-            logger.debug("job %s handle %s output %s", job.job_id, job.handler, line)
+    job = _state.curr_jobs[job_id]
+    shi = job.shell_job_info
+    _log_shell_job_output(job)
 
     if not shi.grp.count_running():
+        # output one last time for cmd(s)
+        _log_shell_job_output(job)
         _enqueue_cmd((_noop, []))
-        lines = shi.grp.readlines()
-        for _proc, line in lines:
-            logger.debug("job %s handle %s output %s", job.job_id, job.handler, line)
+
         if not job.shell_job_info_cmds:
             _notifyDispatcherHandlerDoneEvent(
-                "job {} handle {} is finished with rc {}".format(job.job_id, job.handler,
-                                                                 job.shell_job_info_rc))
+                "job {} handle {} finished with rc {}".format(job.job_id, job.handler,
+                                                              job.shell_job_info_rc))
             return True
 
         cmd = job.shell_job_info_cmds.pop(0)
         rc = 0
-        for _p, rc in shi.grp.get_exit_codes():
-            if rc != 0:
-                job.shell_job_info_rc = rc
-                break
+        if not job.shell_job_info_proc_handles:
+            # If we make it here, it means that last cmd did not make it
+            # very far, and there are no exit_codes in shi that we can use.
+            # In such cases, simply use the value stored in aggregate result.
+            rc = job.shell_job_info_rc
+        else:
+            for _p, rc in shi.grp.get_exit_codes():
+                if rc != 0:
+                    job.shell_job_info_rc = rc
+                    break
         logger.debug("job %s handle %s finished cmd %s exit code %s", job.job_id, job.handler, cmd,
                      rc)
         shi.grp.clear_finished()
+
         if job.shell_job_info_rc and shi.stop_on_failure:
             job.shell_job_info_cmds.clear()
+
         if shi.in_sequence and job.shell_job_info_cmds:
             cmd = job.shell_job_info_cmds[0]
             logger.debug("job %s handle %s starting command cmd %s", job.job_id, job.handler, cmd)
@@ -260,7 +289,7 @@ def _check_job(job_id):
                 logger.error("job %s handle %s failed command %s: %s", job.job_id, job.handler,
                              cmd, e)
                 job.shell_job_info_rc = -2
-                job.shell_job_info_cmds.pop(0)
+                #job.shell_job_info_cmds.pop(0)  NOTE: pop(0) happens on next iteration
                 job.shell_job_info_proc_handles = []
 
     now = datetime.datetime.now()
@@ -332,7 +361,7 @@ def do_dispatch(topic, payload):
 # =============================================================================
 
 
-def _signal_handler(signal, frame):
+def _signal_handler(_signal, _frame):
     logger.info("process terminated")
     sys.exit(0)
 
@@ -342,7 +371,7 @@ def _signal_handler(signal, frame):
 
 logger = log.getLogger()
 if __name__ == "__main__":
-    log.initLogger()
+    log.initLogger(testing=True)
     do_init(None)
     signal.signal(signal.SIGINT, _signal_handler)
     while True:

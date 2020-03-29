@@ -1,0 +1,214 @@
+---
+
+# mqtt     is a dict
+# topics   is a dict key is TopicStr data is a PayloadStr
+# payloads is a dict key is PayloadStr or "default" data is a HandlerName
+# handlers is a dict key is HandlerName data is a Job
+# job      is a dict with vars, attrs and commands
+# commands is a list of Commands or Jobs
+
+mqtt:
+    host: 192.168.10.238
+topics:
+    /buttonbox2/buttons:
+        '{"p":"0x0000000000000001","l":"0x0000000000000000","x":"0x0000000000000000"}': button01
+        '{"p":"0x0000000000000002","l":"0x0000000000000000","x":"0x0000000000000000"}': button02
+        '{"p":"0x0000000000000004","l":"0x0000000000000000","x":"0x0000000000000000"}': button03
+        '{"p":"0x0000000000000008","l":"0x0000000000000000","x":"0x0000000000000000"}': button04
+        '{"p":"0x0000000000000010","l":"0x0000000000000000","x":"0x0000000000000000"}': button05
+        '{"p":"0x0000000000000020","l":"0x0000000000000000","x":"0x0000000000000000"}': button06
+        '{"p":"0x0000000000000040","l":"0x0000000000000000","x":"0x0000000000000000"}': button07
+        '{"p":"0x0000000000000080","l":"0x0000000000000000","x":"0x0000000000000000"}': button08
+
+        '{"p":"0x0000000000000100","l":"0x0000000000000000","x":"0x0000000000000000"}': button09
+        '{"p":"0x0000000000000200","l":"0x0000000000000000","x":"0x0000000000000000"}': button10
+        '{"p":"0x0000000000000400","l":"0x0000000000000000","x":"0x0000000000000000"}': button11
+        '{"p":"0x0000000000000800","l":"0x0000000000000000","x":"0x0000000000000000"}': button12
+        '{"p":"0x0000000000001000","l":"0x0000000000000000","x":"0x0000000000000000"}': button13
+        '{"p":"0x0000000000002000","l":"0x0000000000000000","x":"0x0000000000000000"}': button14
+        '{"p":"0x0000000000004000","l":"0x0000000000000000","x":"0x0000000000000000"}': button15
+        '{"p":"0x0000000000008000","l":"0x0000000000000000","x":"0x0000000000000000"}': button16
+
+        '{"p":"0x0000000000010000","l":"0x0000000000000000","x":"0x0000000000000000"}': button17
+        '{"p":"0x0000000000020000","l":"0x0000000000000000","x":"0x0000000000000000"}': button18
+        '{"p":"0x0000000000040000","l":"0x0000000000000000","x":"0x0000000000000000"}': button19
+        '{"p":"0x0000000000080000","l":"0x0000000000000000","x":"0x0000000000000000"}': button20
+        #'{"p":"0x0000000000100000","l":"0x0000000000000000","x":"0x0000000000000000"}': button21
+        #'{"p":"0x0000000000200000","l":"0x0000000000000000","x":"0x0000000000000000"}': button22
+        #'{"p":"0x0000000000400000","l":"0x0000000000000000","x":"0x0000000000000000"}': button23
+        #'{"p":"0x0000000000800000","l":"0x0000000000000000","x":"0x0000000000000000"}': button24
+
+        '{"p":"0x8000000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button64
+    /buttonbox2/battery:
+        default: battery
+    /office/light_switch:
+        'on':  office_light_is_on
+        'off': office_light_is_off
+    /masterroom/light_switch:
+        'on':  masterroom_light_is_on
+        'off': masterroom_light_is_off
+    /rf24/clapper/oper_flag/clapper_power:
+        'on':  clapper_light_is_on
+        'off': clapper_light_is_off
+    # HACK: we should only need /rf24/clapper/oper_flag/clapper_power
+    #       but rf24 is not very reliable, so we will pay attention
+    #       to the admin as well
+    /rf24/clapper/admin_flag/clapper_power:
+        'on':  clapper_light_is_on
+        'off': clapper_light_is_off
+globals:
+    PUB: mosquitto_pub -h 192.168.10.238 -t
+    BBOX2: '%PUB /buttonbox2/cmd -m'
+handlers:
+    _aplay:
+        vars: { WAV: /home/pi/wav/alexa_tell_me_a_bad_joke.wav }
+        cmd: aplay -D plughw:1,0 %WAV
+    _aplay2:
+        vars: { WAV2: /home/pi/wav/hi.wav }
+        cmd: aplay -D plughw:1,0 %WAV2
+    _flite:
+        vars: { WAV: /tmp/output.%handler.wav, FLITE_VOICE: awb, TXT: 'hello there' }
+        cmds:
+            - flite -voice %FLITE_VOICE -t " %TXT " -o %WAV
+            - _aplay
+    _ledStrip:
+        vars: { STRIP_DATA: ledStripMode=0&timeout=1&clearPixels=1 }
+        cmds:
+            - >-
+              curl -X POST -d %STRIP_DATA
+              'http://127.0.0.1/ledStrip'
+    office_light_is_on:
+        vars:
+            GREEN11: '''{"op" : "set", "id": 100, "pixelMask": [1, 0], "color": 4096}'''
+            GREEN12: '''{"op" : "set", "id": 100, "animation": {"blink": 0, "pulse": 1}}'''
+            RED21:   '''{"op" : "set", "id": 101, "pixelMask": [2, 0], "color": 458752}'''
+            RED22:   '''{"op" : "set", "id": 101, "animation": {"dependsOn": 100}}'''
+        cmds: [ '%BBOX2 %GREEN11', '%BBOX2 %GREEN12', '%BBOX2 %RED21', '%BBOX2 %RED22' ]
+    office_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 100}''' ]
+    _office_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /office/light_switch -m %ACTION', echo office light action %ACTION ]
+    masterroom_light_is_on:
+        vars:
+            GREEN11: '''{"op" : "set", "id": 102, "pixelMask": [65536,0], "color": 4096}'''
+            GREEN12: '''{"op" : "set", "id": 102, "animation": {"blink": 0, "pulse": 1}}'''
+            RED21:   '''{"op" : "set", "id": 103, "pixelMask": [131072,0], "color": 458752}'''
+            RED22:   '''{"op" : "set", "id": 103, "animation": {"dependsOn": 102}}'''
+        cmds: [ '%BBOX2 %GREEN11', '%BBOX2 %GREEN12', '%BBOX2 %RED21', '%BBOX2 %RED22' ]
+    masterroom_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 102}''' ]
+    _masterroom_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /masterroom/light_switch -m %ACTION', echo masterroom light action %ACTION ]
+    clapper_light_is_on:
+        vars:
+            GREEN11: '''{"op" : "set", "id": 104, "pixelMask": [262144,0], "color": 4096}'''
+            GREEN12: '''{"op" : "set", "id": 104, "animation": {"blink": 0, "pulse": 1}}'''
+            RED21:   '''{"op" : "set", "id": 105, "pixelMask": [524288,0], "color": 458752}'''
+            RED22:   '''{"op" : "set", "id": 105, "animation": {"dependsOn": 104}}'''
+        cmds: [ '%BBOX2 %GREEN11', '%BBOX2 %GREEN12', '%BBOX2 %RED21', '%BBOX2 %RED22' ]
+    clapper_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 104}''' ]
+    _clapper_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /rf24/clapper/admin_flag/clapper_power -m %ACTION', echo clapper light action %ACTION ]
+    button01:
+        vars: { ACTION: 'on' }
+        cmd: _office_light
+    button02:
+        vars: { ACTION: 'off' }
+        cmd: _office_light
+    button03:
+        attrs: { in_sequence: false }
+        cmds:
+            - >-
+              curl -X POST -d
+              'msg=#cookie&color=2&y=5&repeats=0&bounce=no&font=2&confetti=25'
+              http://127.0.0.1/msgMode
+            - espeak -v en-sc "message"
+    button04:
+        vars:
+            MSG: bouncing message, bounce
+            TIMEOUT: 20
+            X: 7
+        cmds:
+            - >-
+              curl -X POST -d
+              "msg=%MSG&noScroll=1&bounce=1&timeout=%TIMEOUT&x=%X"
+              http://127.0.0.1/msgMode
+    button05:
+        attrs: { stop_on_failure: false, timeout: 13 }
+        # stickman script is sticky. We need timeout to kill it
+        cmds: [ /home/pi/oclock.git/misc/stickManAnimation.sh ]
+    button06:
+        vars:
+            WAV: /home/pi/wav/alexa_tell_chevy_to_start_vehicle.wav
+            WAV2: /home/pi/wav/chevy_secret.wav
+        cmds:
+            - _aplay
+            - sleep 7
+            - echo #'espeak -w %WAV2 "super secret, one"'
+            - _aplay2
+    button07:
+        cmd: _aplay
+    button08:
+        attrs: { in_sequence: false }
+        cmds:
+            - curl -X POST -d "msg=.&timeout=3" http://127.0.0.1/msgMode
+            - curl -X POST -d "clearAll=1" http://127.0.0.1/msgBackground
+            - curl -X POST -d "clearAll=1" http://127.0.0.1/imgBackground
+    button09:
+        vars:
+            STRIP_DATA: "'ledStripMode=2&red=127&green=0&blue=0&timeout=7200'"
+        cmd: _ledStrip
+    button10:
+        vars:
+            STRIP_DATA: "'ledStripMode=2&red=0&green=127&blue=0&timeout=7200'"
+        cmd: _ledStrip
+    button11:
+        vars:
+            STRIP_DATA: "'ledStripMode=2&red=0&green=0&blue=127&timeout=7200'"
+        cmd: _ledStrip
+    button12:
+        # pastel mode
+        vars:
+            STRIP_DATA: "'ledStripMode=1&timeout=7200'"
+        cmd: _ledStrip
+    button13:
+        # rainbow mode
+        vars:
+            STRIP_DATA: "'ledStripMode=3&timeout=7200'"
+        cmd: _ledStrip
+    button14:
+        # scan mode
+        vars:
+            STRIP_DATA: "'ledStripMode=4&timeout=7200'"
+        cmd: _ledStrip
+    button15:
+        # count mode
+        vars:
+            STRIP_DATA: "'ledStripMode=5&timeout=7200'"
+        cmd: _ledStrip
+    button16:
+        # clear led strip
+        cmd: _ledStrip
+    button17:
+        vars: { ACTION: 'on' }
+        cmd: _masterroom_light
+    button18:
+        vars: { ACTION: 'off' }
+        cmd: _masterroom_light
+    button19:
+        vars: { ACTION: 'on' }
+        cmd: _clapper_light
+    button20:
+        vars: { ACTION: 'off' }
+        cmd: _clapper_light
+    button64:
+        vars: { TXT: "Alexa, what time is it?" }
+        cmd: _flite
+    battery:
+        attrs: { log_output: true }
+        cmds:
+            - echo battery has %volts volts. low is set to %isLow

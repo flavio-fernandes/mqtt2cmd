@@ -1,0 +1,68 @@
+---
+
+# mqtt     is a dict
+# topics   is a dict key is TopicStr data is a PayloadStr
+# payloads is a dict key is PayloadStr or "default" data is a HandlerName
+# handlers is a dict key is HandlerName data is a Job
+# job      is a dict with vars, attrs and commands
+# commands is a list of Commands or Jobs
+
+# /usr/local/Cellar/mosquitto/1.6.9/bin/mosquitto_sub -h 192.168.2.238 \
+#   -F '@Y-@m-@dT@H:@M:@S@z : %q : %t : %p' \
+#   -t /mqtttester/status -t /mqtttester/ping
+
+mqtt:
+    host: 192.168.2.238
+    client_id: mqtttester
+    status_topic: /mqtttester/status
+    ping_topic: /mqtttester/ping
+knobs:
+    log_to_console: true
+    #log_level_debug: true
+topics:
+    /buttonbox2/buttons:
+        '{"p":"0x0100000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button56
+        '{"p":"0x0200000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button57
+    /buttonbox2/battery:
+        default: battery
+globals:
+    PUB: /usr/local/Cellar/mosquitto/1.6.9/bin/mosquitto_pub -h 192.168.2.238 -t
+handlers:
+    battery:
+        attrs: { log_output: true }
+        vars: { recursiveIsLow: '%isLow' }
+        cmds:
+            - echo battery has %volts volts. low is %recursiveIsLow.
+    button56:
+        cmd: buttonSample2
+    button57:
+        cmd: buttonSample3
+    buttonSample1:
+        attrs:
+            #timeout: 10
+            stop_on_failure: false
+            in_sequence: false
+            log_output: true
+        vars: { four: 4 }
+        cmds:
+            - echo one
+            - echo two
+            - sleep 5
+            - sleep 2
+            - sleep 5
+            - echo three
+            - echo %four
+    buttonSample2:
+        vars: { four: 4444, world: there }
+        cmds:
+            - echo %topic %payload %p hello %world
+            - buttonSample1
+            - sleep 11
+            - echo bye bye %world
+    buttonSample3:
+        attrs: { stop_on_failure: true, in_sequence: true, timeout: 9, log_output: true }
+        cmds:
+            - echo hello from %handler with payload.p == %p
+            - sleep 6
+            - sleep 7
+            - echo msg before timeout of %timeout seconds

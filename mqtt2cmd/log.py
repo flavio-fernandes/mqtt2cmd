@@ -16,9 +16,9 @@ def _log_handler_address(files=tuple()):
     raise Exception("Invalid files: %s" % ", ".join(files))
 
 
-def initLogger():
+def initLogger(testing=False):
     logger = getLogger()
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     format = '%(asctime)s [mqtt2cmd] %(module)12s:%(lineno)-d %(levelname)-8s %(message)s'
     formatter = logging.Formatter(format)
 
@@ -29,9 +29,18 @@ def initLogger():
                            facility=SysLogHandler.LOG_DAEMON)
     syslog.setFormatter(formatter)
     logger.addHandler(syslog)
+    if testing:
+        log_to_console()
+        set_log_level_debug()
 
-    # FIXME(ff): DEBUG
-    if True:
-        consoleHandler = logging.StreamHandler()
-        consoleHandler.setFormatter(formatter)
-        logger.addHandler(consoleHandler)
+
+def log_to_console():
+    consoleHandler = logging.StreamHandler()
+    format = '%(asctime)s %(module)12s:%(lineno)-d %(levelname)-8s %(message)s'
+    formatter = logging.Formatter(format)
+    consoleHandler.setFormatter(formatter)
+    getLogger().addHandler(consoleHandler)
+
+
+def set_log_level_debug():
+    getLogger().setLevel(logging.DEBUG)

@@ -1,0 +1,36 @@
+---
+
+# topics   is a dict key is TopicStr data is a PayloadStr
+# payloads is a dict key is PayloadStr or "default" data is a HandlerName
+# handlers is a dict key is HandlerName data is a Job
+# job      is a dict with vars, attrs and commands
+# commands is a list of Commands or Jobs
+
+knobs:
+    # Note: normally you don't set these... here just to show how to
+    #       devel and debug
+    log_to_console: true
+    log_level_debug: false
+mqtt:
+    host: 192.168.123.123
+topics:
+    /buttonbox/battery:
+        '{"volts":"3.75"}': battery_ok
+        default: battery
+    /iotbox/alert:
+        red: red_alert
+        default: other_alert
+handlers:
+    battery_ok: {}
+    battery:
+        attrs: { log_output: true }
+        cmds:
+            - echo battery has %volts volts.
+            - hostname
+    red_alert:
+        cmds:
+            - echo this is red alert
+            - other_alert
+    other_alert:
+        cmd: echo be alert about %payload
+

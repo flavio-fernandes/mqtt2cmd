@@ -13,7 +13,7 @@ if [ ! -e ./env ]; then
     python3 -m venv --copies env
 fi
 source ./env/bin/activate
-pip install --ignore-installed --verbose -r ./requirements.txt
+pip install --ignore-installed -r ./requirements.txt
 deactivate
 
 popd

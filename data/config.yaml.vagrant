@@ -1,0 +1,116 @@
+---
+
+# mqtt     is a dict
+# topics   is a dict key is TopicStr data is a PayloadStr
+# payloads is a dict key is PayloadStr or "default" data is a HandlerName
+# handlers is a dict key is HandlerName data is a Job
+# job      is a dict with vars, attrs and commands
+# commands is a list of Commands or Jobs
+
+mqtt:
+    host: 192.168.123.123
+    client_id: mqtttester
+knobs:
+    log_to_console: false
+    log_level_debug: false
+topics:
+    /foo/bar:
+        hi: handle_bar_hi
+        hello: handle_bar_hi
+        ola: handle_bar_ola1
+        'ola from hi': handle_bar_ola2
+        default: handle_bar_default
+    /foo/foo:
+        default: handle_foofoo
+    /foo/ping:
+        eric: handle_ping_eric
+        default: handle_ping
+    /buttonbox/buttons:
+        '{"p":"0x0100000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button56
+        '{"p":"0x0200000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button57
+        test_stop_on_failure: fail_fast
+        test_continue_on_failure: failure_wont_stop_us
+        test_parallel_failure: fail_fast_and_furious
+    /buttonbox/battery:
+        default: battery
+globals:
+    PUB: mosquitto_pub -h 192.168.123.123 -t
+handlers:
+    handle_bar_hi:
+        cmd: '%PUB /foo/bar -m "ola from %payload"'
+    handle_bar_ola1:
+        vars: { three: 3 }
+        cmds:
+            - echo the topic is %topic
+            - uptime
+            - handle_bar_ola2
+    handle_bar_ola2:
+        attrs: { log_output: true }
+        vars: { one: '%two', two: '%three', three: 'los tres amigos' }
+        cmds: [ 'echo "greetings from %three t: %topic p: %payload h: %handler"', echo "good bye" ]
+    handle_bar_default:
+        attrs: { log_output: true }
+        cmd: 'echo received t: %topic p: %payload h: %handler'
+    handle_foofoo:
+        attrs: { log_output: true }
+        cmd: 'echo %payload is a hero'
+    handle_ping_eric:
+        vars: { hero: 'Eric Clapton' }
+        cmd: handle_ping
+    handle_ping:
+        vars: { hero: 'Carlos Santana' }
+        cmd: '%PUB /foo/foo -m "%hero"'
+    battery:
+        attrs: { log_output: true }
+        vars: { recursive_isLow: '%isLow' }
+        cmds:
+            - echo battery has %volts volts. low is %recursive_isLow.
+    button56:
+        cmd: buttonSample2
+    button57:
+        cmd: buttonSample3
+    buttonSample1:
+        attrs:
+            timeout: 4
+            #stop_on_failure: false
+            in_sequence: false
+            log_output: true
+        vars: { four: 4 }
+        cmds:
+            - echo one
+            - echo two
+            - echo three
+            - sleep 2
+            - echo %four
+            - sleep 3
+            - sleep 4
+            - echo five
+    buttonSample2:
+        vars: { four: 4444, world: there }
+        cmds:
+            - echo %topic %payload %p hello %world
+            - buttonSample1
+            - echo bye bye %world
+    buttonSample3:
+        attrs: { stop_on_failure: true, in_sequence: false, timeout: 6, log_output: true }
+        cmds:
+            - echo hello from %handler with payload.p == %p
+            - sleep 4
+            - sleep 4
+            - echo msg before timeout of %timeout seconds
+    fail_fast:
+        attrs: { log_output: true }
+        cmds:
+            - 'echo %payload starting'
+            - echo testing checkpoint1
+            - ls /321boom123/boom/boom/boom
+            - echo testing checkpoint2
+    failure_wont_stop_us:
+        attrs: { stop_on_failure: false }
+        cmds:
+            - echo testing checkpoint0
+            - fail_fast
+            - echo testing checkpoint3
+    fail_fast_and_furious:
+        attrs: { in_sequence: false }
+        cmd: failure_wont_stop_us

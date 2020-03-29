@@ -1,0 +1,11 @@
+[Unit]
+Description=MQTT based command dispatcher
+
+[Service]
+User=pi
+Type=simple
+ExecStart=/home/pi/mqtt2cmd.git/mqtt2cmd/bin/start_mqtt2cmd.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

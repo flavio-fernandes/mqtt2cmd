@@ -8,13 +8,13 @@ import time
 import dill
 import paho.mqtt.client as mqtt
 from six.moves import queue
+import stopit
 
 from mqtt2cmd import const
 from mqtt2cmd import events
 from mqtt2cmd import log
 from mqtt2cmd.config import Cfg
 
-DEFAULT_MQTT_BROKER_IP = "192.168.10.238"
 CMDQ_SIZE = 100
 CMDQ_GET_TIMEOUT = 66  # seconds. May affect ping publishing
 TOPIC_QOS = 1
@@ -22,10 +22,14 @@ _state = None
 
 
 class State(object):
-    def __init__(self, queueEventFun, mqtt_broker_ip, topics):
+    def __init__(self, queueEventFun, mqtt_broker_ip, mqtt_client_id, mqtt_status_topic,
+                 mqtt_ping_topic, topics):
         self.queueEventFun = queueEventFun  # queue for output events
         self.cmdq = multiprocessing.Queue(CMDQ_SIZE)  # queue for input commands
         self.mqtt_broker_ip = mqtt_broker_ip
+        self.mqtt_client_id = mqtt_client_id
+        self.mqtt_status_topic = mqtt_status_topic
+        self.mqtt_ping_topic = mqtt_ping_topic
         self.topics = topics
         self.mqtt_client = None
         self.next_ping_ts = datetime.datetime.now()
@@ -39,11 +43,15 @@ def do_init(queueEventFun=None):
     global _state
 
     cfg = Cfg()
-    mqtt_broker_ip = cfg.mqtt_host or DEFAULT_MQTT_BROKER_IP
+    mqtt_broker_ip = cfg.mqtt_host or const.MQTT_DEFAULT_BROKER_IP
+    mqtt_client_id = cfg.mqtt_client_id or const.MQTT_CLIENT_ID_DEFAULT
+    mqtt_status_topic = cfg.mqtt_status_topic or const.MQTT_CLIENT_DEFAULT_TOPIC_STATUS
+    mqtt_ping_topic = cfg.mqtt_ping_topic or const.MQTT_CLIENT_DEFAULT_TOPIC_PING
     topics = cfg.topics
     assert isinstance(topics, dict)
 
-    _state = State(queueEventFun, mqtt_broker_ip, list(topics.keys()))
+    _state = State(queueEventFun, mqtt_broker_ip, mqtt_client_id, mqtt_status_topic,
+                   mqtt_ping_topic, list(topics.keys()))
     # logger.debug("mqttclient init called")
 
 
@@ -71,11 +79,12 @@ def _notifyEvent(event):
 
 
 def client_connect_callback(client, userdata, flags_dict, rc):
+    global _state
     if rc != mqtt.MQTT_ERR_SUCCESS:
-        logger.warning("client connect failed with flags %s rc %s %s",
-                       flags_dict, rc, mqtt.error_string(rc))
+        logger.warning("client %s connect failed with flags %s rc %s %s",
+                       _state.mqtt_client_id, flags_dict, rc, mqtt.error_string(rc))
         return
-    logger.info("client connected with flags %s rc %s", flags_dict, rc)
+    logger.info("client %s connected with flags %s rc %s", _state.mqtt_client_id, flags_dict, rc)
     # userdata is list of topics we care about
     assert isinstance(userdata, list), "Unexpected userdata from callback: {}".format(userdata)
     assert userdata[0] == 'topics', "Unexpected userdata from callback: {}".format(userdata)
@@ -91,10 +100,10 @@ def client_message_callback(_client, _userdata, msg):
     _enqueue_cmd((_notifyMqttMsgEvent, params))
 
 
-def _setup_mqtt_client(broker_ip, topics):
+def _setup_mqtt_client(broker_ip, client_id, topics):
     try:
         userdata = ['topics'] + topics
-        client = mqtt.Client(client_id="mqtt2cmd", userdata=userdata)
+        client = mqtt.Client(client_id=client_id, userdata=userdata)
         client.on_connect = client_connect_callback
         client.on_message = client_message_callback
 
@@ -113,7 +122,8 @@ def do_iterate():
     global _state
 
     if not _state.mqtt_client:
-        _state.mqtt_client = _setup_mqtt_client(_state.mqtt_broker_ip, _state.topics)
+        _state.mqtt_client = _setup_mqtt_client(_state.mqtt_broker_ip, _state.mqtt_client_id,
+                                                _state.topics)
         if not _state.mqtt_client:
             logger.warning("got no mqttt client")
             time.sleep(30)
@@ -144,11 +154,11 @@ def do_iterate():
 
 
 def _do_handle_mqtt_status(payload):
-    _mqtt_publish(const.MQTT_CLIENT_STATUS_TOPIC, payload)
+    _mqtt_publish(_state.mqtt_status_topic, payload)
 
 
 def _do_handle_mqtt_ping(payload):
-    _mqtt_publish(const.MQTT_CLIENT_PING_TOPIC, payload)
+    _mqtt_publish(_state.mqtt_ping_topic, payload)
 
 
 # =============================================================================
@@ -160,11 +170,13 @@ def _mqtt_publish(topic, value=None, qos=0):
         logger.warning("no client to publish mqtt topic %s %s", topic, value)
         return
     try:
-        # logger.debug("publishing mqtt topic %s %s", topic, newState)
-        info = _state.mqtt_client.publish(topic, value, qos)
-        info.wait_for_publish()
+        with stopit.ThreadingTimeout(9.90, swallow_exc=False) as timeout_ctx:
+            # logger.debug("publishing mqtt topic %s %s", topic, newState)
+            info = _state.mqtt_client.publish(topic, value, qos)
+            info.wait_for_publish()
     except Exception as e:
-        logger.error("client failed publish mqtt topic %s %s %s", topic, value, e)
+        logger.error("client failed publish mqtt topic %s %s timeout_ctx %s %s", topic, value,
+                     timeout_ctx, e)
         return
     logger.debug("published mqtt topic %s %s", topic, value)
 
@@ -194,7 +206,7 @@ def do_mqtt_status(payload):
 # =============================================================================
 
 
-def _signal_handler(signal, frame):
+def _signal_handler(_signal, _frame):
     logger.info("process terminated")
     sys.exit(0)
 
@@ -204,7 +216,7 @@ def _signal_handler(signal, frame):
 
 logger = log.getLogger()
 if __name__ == "__main__":
-    log.initLogger()
+    log.initLogger(testing=True)
     do_init(None)
     signal.signal(signal.SIGINT, _signal_handler)
     while True:

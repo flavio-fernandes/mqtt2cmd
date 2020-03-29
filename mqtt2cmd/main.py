@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import collections
 import multiprocessing
 
 from six.moves import queue
@@ -7,6 +7,7 @@ from six.moves import queue
 from mqtt2cmd import events, dispatcher
 from mqtt2cmd import log
 from mqtt2cmd import mqttclient
+from mqtt2cmd.config import Cfg
 
 EVENTQ_SIZE = 1000
 EVENTQ_GET_TIMEOUT = 15  # seconds
@@ -126,7 +127,7 @@ def main():
     [p.terminate() for p in myProcesses]
 
 
-# globals
+# cfg_globals
 stop_gracefully = False
 logger = None
 eventq = None
@@ -137,6 +138,14 @@ if __name__ == "__main__":
 
     logger = log.getLogger()
     log.initLogger()
+
+    knobs = Cfg().knobs
+    if isinstance(knobs, collections.abc.Mapping):
+        if knobs.get('log_to_console'):
+            log.log_to_console()
+        if knobs.get('log_level_debug'):
+            log.set_log_level_debug()
+
     logger.debug("mqtt2cmd process started")
     eventq = multiprocessing.Queue(EVENTQ_SIZE)
     myProcesses.append(MqttclientProcess(eventq))

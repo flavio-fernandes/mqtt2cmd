@@ -1,5 +1,7 @@
 dill
-six
+flashtext
 paho-mqtt
 pyyaml>=3.11
 shelljob
+six
+stopit
