@@ -13,7 +13,7 @@ get_log_lines () {
   sudo journalctl -u mqtt2cmd.service --no-pager --lines=${NUM_LINES} --output=cat > ${TMP_OUTPUT}
 }
 
-echo TEST: default handler. Used when we do need to match on a particular payload
+echo TEST: default handler. Used when we do not need to match on a particular payload
 mosquitto_pub -h ${MQTT_BROKER} -t /foo/bar -m "testing default handler"
 get_log_lines
 grep --quiet -E 'received t: /foo/bar p: testing default handler h: handle_bar_default' ${TMP_OUTPUT} || \

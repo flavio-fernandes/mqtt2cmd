@@ -6,15 +6,15 @@ import multiprocessing
 import signal
 import sys
 from collections import namedtuple
-from flashtext import KeywordProcessor
 
 import dill
-from shelljob import proc
+from flashtext import KeywordProcessor
 from six.moves import queue
 
 from mqtt2cmd import const
 from mqtt2cmd import events
 from mqtt2cmd import log
+from mqtt2cmd import proc
 from mqtt2cmd.config import Cfg
 
 CMDQ_SIZE = 100
@@ -56,7 +56,8 @@ def do_init(queueEventFun=None):
 
 # =============================================================================
 
-ShellJobInfo = namedtuple('ShellJobInfo', 'grp timeout stop_on_failure in_sequence log_output')
+ShellJobInfo = namedtuple('ShellJobInfo',
+                          'grp timeout stop_on_failure in_sequence log_output shell')
 
 
 class Job(dict):
@@ -165,6 +166,7 @@ def _do_handle_dispatch(topic, payload):
     stop_on_failure = job.get(const.CONFIG_STOP, const.CONFIG_STOP_DEFAULT)
     in_sequence = job.get(const.CONFIG_IN_SEQ, const.CONFIG_IN_SEQ_DEFAULT)
     log_output = job.get(const.CONFIG_LOG_CMD_OUTPUT, const.CONFIG_LOG_CMD_OUTPUT_DEFAULT)
+    shell = job.get(const.CONFIG_SHELL, const.CONFIG_SHELL_DEFAULT)
 
     logger.debug("starting job {})".format(job))
 
@@ -177,6 +179,8 @@ def _do_handle_dispatch(topic, payload):
         job_params_info += ' timeout: {}'.format(timeout)
     if log_output != const.CONFIG_LOG_CMD_OUTPUT_DEFAULT:
         job_params_info += ' log_output: {}'.format(log_output)
+    if shell != const.CONFIG_SHELL_DEFAULT:
+        job_params_info += ' shell: {}'.format(shell)
 
     logger.info("starting job: {} handler: {} cmds: {}{} (curr total jobs: {})".format(
         job.job_id, job.handler, job.commands, job_params_info, jobs_count + 1))
@@ -186,7 +190,7 @@ def _do_handle_dispatch(topic, payload):
     for c in job.commands:
         logger.debug("job %s handle %s starting command %s", job.job_id, job.handler, c)
         try:
-            p = grp.run(c)
+            p = grp.run(c, shell=shell)
             job.shell_job_info_proc_handles.append(p)
         except proc.CommandException as e:
             logger.error("job %s handle %s failed command %s: %s", job.job_id, job.handler, c, e)
@@ -198,7 +202,8 @@ def _do_handle_dispatch(topic, payload):
         if in_sequence:
             break
 
-    job.shell_job_info = ShellJobInfo(grp, timeout, stop_on_failure, in_sequence, log_output)
+    job.shell_job_info = ShellJobInfo(grp, timeout, stop_on_failure, in_sequence, log_output,
+                                      shell)
     _state.curr_jobs[job.job_id] = job
     _enqueue_cmd((_noop, []))
 
@@ -282,7 +287,7 @@ def _check_job(job_id):
             cmd = job.shell_job_info_cmds[0]
             logger.debug("job %s handle %s starting command cmd %s", job.job_id, job.handler, cmd)
             try:
-                p = shi.grp.run(cmd)
+                p = shi.grp.run(cmd, shi.shell)
                 # start new proc handles
                 job.shell_job_info_proc_handles = [p]
             except proc.CommandException as e:

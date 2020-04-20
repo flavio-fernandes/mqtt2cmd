@@ -1,4 +1,4 @@
-# mqtt2cmd
+#mqtt2cmd
 #### Python based project to translate mqtt events into shell commands
 
 ## Goals
@@ -58,7 +58,7 @@ $ vi ./data/config.yaml
 $ ./mqtt2cmd/bin/start_mqtt2cmd.sh ${PWD}/data/config.yaml
 ```
 
-If you are interested in starting mqtt2cmd as a systemd service, edit and copy
+If you are interested in starting mqtt2cmd as a systemd service, copy
 the service file to  `/lib/systemd/system/`
 
 ```bash
