@@ -52,7 +52,7 @@ class Group:
                                   stderr=subprocess.STDOUT,
                                   # needed to detach from calling terminal (other wacky things
                                   # can happen)
-                                  stdin=subprocess.DEVNULL,
+                                  stdin=subprocess.PIPE,
                                   close_fds=True,
                                   )
         handle.group_output_done = False
@@ -71,6 +71,7 @@ class Group:
             # To force return of any waiting read (and indicate this process is done
             self.output.put((handle, None))
             handle.stdout.close()
+            handle.stdin.close()
             self.waiting -= 1
 
         block_thread = threading.Thread(target=block_read)
@@ -191,6 +192,17 @@ class Group:
             if not handle.group_output_done or handle.poll() is None:
                 nhandles.append(handle)
         self.handles = nhandles
+
+    def close(self):
+        """
+            Experimental closing of all handles, even if they haven't finished. This likely doesn't
+            work on all platforms
+        """
+        for handle in self.handles:
+            handle.group_output_done = True
+            handle.terminate()
+
+        self.get_exit_codes()
 
 
 class BadExitCode(Exception):
