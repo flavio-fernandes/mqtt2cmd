@@ -28,6 +28,9 @@ class Group:
         self.handles = []
         self.waiting = 0
 
+    def __del__(self):
+        self.close()
+
     def run(self, cmd, shell=False):
         """
             Adds a new process to this object. This process is run and the output collected.
@@ -199,8 +202,11 @@ class Group:
             work on all platforms
         """
         for handle in self.handles:
+            try:
+                handle.terminate()
+            except Exception:
+                pass
             handle.group_output_done = True
-            handle.terminate()
 
         self.get_exit_codes()
 
