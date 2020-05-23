@@ -18,6 +18,7 @@ topics:
         '{"p":"0x0000000000000010","l":"0x0000000000000000","x":"0x0000000000000000"}': button05
         '{"p":"0x0000000000000020","l":"0x0000000000000000","x":"0x0000000000000000"}': button06
         '{"p":"0x0000000000000040","l":"0x0000000000000000","x":"0x0000000000000000"}': button07
+        '{"p":"0x0000000000000060","l":"0x0000000000000000","x":"0x0000000000000000"}': button6and7
         '{"p":"0x0000000000000080","l":"0x0000000000000000","x":"0x0000000000000000"}': button08
 
         '{"p":"0x0000000000000100","l":"0x0000000000000000","x":"0x0000000000000000"}': button09
@@ -33,10 +34,19 @@ topics:
         '{"p":"0x0000000000020000","l":"0x0000000000000000","x":"0x0000000000000000"}': button18
         '{"p":"0x0000000000040000","l":"0x0000000000000000","x":"0x0000000000000000"}': button19
         '{"p":"0x0000000000080000","l":"0x0000000000000000","x":"0x0000000000000000"}': button20
-        #'{"p":"0x0000000000100000","l":"0x0000000000000000","x":"0x0000000000000000"}': button21
-        #'{"p":"0x0000000000200000","l":"0x0000000000000000","x":"0x0000000000000000"}': button22
+        '{"p":"0x0000000000100000","l":"0x0000000000000000","x":"0x0000000000000000"}': button21
+        '{"p":"0x0000000000200000","l":"0x0000000000000000","x":"0x0000000000000000"}': button22
         #'{"p":"0x0000000000400000","l":"0x0000000000000000","x":"0x0000000000000000"}': button23
         #'{"p":"0x0000000000800000","l":"0x0000000000000000","x":"0x0000000000000000"}': button24
+
+        '{"p":"0x0000000001000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button25
+        '{"p":"0x0000000002000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button26
+        '{"p":"0x0000000004000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button27
+        '{"p":"0x0000000008000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button28
+        '{"p":"0x0000000010000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button29
+        '{"p":"0x0000000020000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button30
+        '{"p":"0x0000000040000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button31
+        '{"p":"0x0000000080000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button32
 
         '{"p":"0x8000000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button64
     /buttonbox2/battery:
@@ -47,6 +57,21 @@ topics:
     /masterroom/light_switch:
         'on':  masterroom_light_is_on
         'off': masterroom_light_is_off
+    /purpleroom/light_switch:
+        'on':  purpleroom_light_is_on
+        'off': purpleroom_light_is_off
+    /basementoffice/light_switch:
+        'on':  basementoffice_light_is_on
+        'off': basementoffice_light_is_off
+    /basementstairs/light_switch:
+        'on':  basementstairs_light_is_on
+        'off': basementstairs_light_is_off
+    /basementfront/light_switch:
+        'on':  basementfront_light_is_on
+        'off': basementfront_light_is_off
+    /basementback/light_switch:
+        'on':  basementback_light_is_on
+        'off': basementback_light_is_off
     /rf24/clapper/oper_flag/clapper_power:
         'on':  clapper_light_is_on
         'off': clapper_light_is_off
@@ -77,42 +102,77 @@ handlers:
             - >-
               curl -X POST -d %STRIP_DATA
               'http://127.0.0.1/ledStrip'
-    office_light_is_on:
+    _common_light_is_on:
         vars:
-            GREEN11: '''{"op" : "set", "id": 100, "pixelMask": [1, 0], "color": 4096}'''
-            GREEN12: '''{"op" : "set", "id": 100, "animation": {"blink": 0, "pulse": 1}}'''
-            RED21:   '''{"op" : "set", "id": 101, "pixelMask": [2, 0], "color": 458752}'''
-            RED22:   '''{"op" : "set", "id": 101, "animation": {"dependsOn": 100}}'''
+            GREEN11: '''{"op" : "set", "id": %ON_PXL_ID, "pixelMask": [%ON_PXL], "color": 4096}'''
+            GREEN12: '''{"op" : "set", "id": %ON_PXL_ID, "animation": {"blink": 0, "pulse": 1}}'''
+            RED21:   '''{"op" : "set", "id": %OFF_PXL_ID, "pixelMask": [%OFF_PXL], "color": 458752}'''
+            RED22:   '''{"op" : "set", "id": %OFF_PXL_ID, "animation": {"dependsOn": %ON_PXL_ID}}'''
         cmds: [ '%BBOX2 %GREEN11', '%BBOX2 %GREEN12', '%BBOX2 %RED21', '%BBOX2 %RED22' ]
+    office_light_is_on:
+        vars: { ON_PXL: '1,0', OFF_PXL: '2,0', ON_PXL_ID: 100, OFF_PXL_ID: 101 }
+        cmd: _common_light_is_on
     office_light_is_off:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 100}''' ]
     _office_light:
         vars: { ACTION: 'toggle' }
         cmds: [ '%PUB /office/light_switch -m %ACTION', echo office light action %ACTION ]
     masterroom_light_is_on:
-        vars:
-            GREEN11: '''{"op" : "set", "id": 102, "pixelMask": [65536,0], "color": 4096}'''
-            GREEN12: '''{"op" : "set", "id": 102, "animation": {"blink": 0, "pulse": 1}}'''
-            RED21:   '''{"op" : "set", "id": 103, "pixelMask": [131072,0], "color": 458752}'''
-            RED22:   '''{"op" : "set", "id": 103, "animation": {"dependsOn": 102}}'''
-        cmds: [ '%BBOX2 %GREEN11', '%BBOX2 %GREEN12', '%BBOX2 %RED21', '%BBOX2 %RED22' ]
+        vars: { ON_PXL: '65536,0', OFF_PXL: '131072,0', ON_PXL_ID: 102, OFF_PXL_ID: 103 }
+        cmd: _common_light_is_on
     masterroom_light_is_off:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 102}''' ]
     _masterroom_light:
         vars: { ACTION: 'toggle' }
         cmds: [ '%PUB /masterroom/light_switch -m %ACTION', echo masterroom light action %ACTION ]
     clapper_light_is_on:
-        vars:
-            GREEN11: '''{"op" : "set", "id": 104, "pixelMask": [262144,0], "color": 4096}'''
-            GREEN12: '''{"op" : "set", "id": 104, "animation": {"blink": 0, "pulse": 1}}'''
-            RED21:   '''{"op" : "set", "id": 105, "pixelMask": [524288,0], "color": 458752}'''
-            RED22:   '''{"op" : "set", "id": 105, "animation": {"dependsOn": 104}}'''
-        cmds: [ '%BBOX2 %GREEN11', '%BBOX2 %GREEN12', '%BBOX2 %RED21', '%BBOX2 %RED22' ]
+        vars: { ON_PXL: '262144,0', OFF_PXL: '524288,0', ON_PXL_ID: 104, OFF_PXL_ID: 105 }
+        cmd: _common_light_is_on
     clapper_light_is_off:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 104}''' ]
     _clapper_light:
         vars: { ACTION: 'toggle' }
         cmds: [ '%PUB /rf24/clapper/admin_flag/clapper_power -m %ACTION', echo clapper light action %ACTION ]
+    purpleroom_light_is_on:
+        vars: { ON_PXL: '1048576,0', OFF_PXL: '2097152,0', ON_PXL_ID: 106, OFF_PXL_ID: 107 }
+        cmd: _common_light_is_on
+    purpleroom_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 106}''' ]
+    _purpleroom_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /purpleroom/light_switch -m %ACTION', echo purpleroom light action %ACTION ]
+    basementoffice_light_is_on:
+        vars: { ON_PXL: '16777216,0', OFF_PXL: '33554432,0', ON_PXL_ID: 108, OFF_PXL_ID: 109 }
+        cmd: _common_light_is_on
+    basementoffice_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 108}''' ]
+    _basementoffice_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /basementoffice/light_switch -m %ACTION', echo basementoffice light action %ACTION ]
+    basementstairs_light_is_on:
+        vars: { ON_PXL: '67108864,0', OFF_PXL: '134217728,0', ON_PXL_ID: 110, OFF_PXL_ID: 111 }
+        cmd: _common_light_is_on
+    basementstairs_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 110}''' ]
+    _basementstairs_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /basementstairs/light_switch -m %ACTION', echo basementstairs light action %ACTION ]
+    basementfront_light_is_on:
+        vars: { ON_PXL: '268435456,0', OFF_PXL: '536870912,0', ON_PXL_ID: 112, OFF_PXL_ID: 113 }
+        cmd: _common_light_is_on
+    basementfront_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 112}''' ]
+    _basementfront_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /basementfront/light_switch -m %ACTION', echo basementfront light action %ACTION ]
+    basementback_light_is_on:
+        vars: { ON_PXL: '1073741824,0', OFF_PXL: '2147483648,0', ON_PXL_ID: 114, OFF_PXL_ID: 115 }
+        cmd: _common_light_is_on
+    basementback_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 114}''' ]
+    _basementback_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /basementback/light_switch -m %ACTION', echo basementback light action %ACTION ]
     button01:
         vars: { ACTION: 'on' }
         cmd: _office_light
@@ -142,6 +202,11 @@ handlers:
         # stickman script is sticky. We need timeout to kill it
         cmds: [ /home/pi/oclock.git/misc/stickManAnimation.sh ]
     button06:
+        cmd: _aplay
+    button07:
+        vars: { TXT: "Alexa, what time is it?" }
+        cmd: _flite
+    button6and7:
         vars:
             WAV: /home/pi/wav/alexa_tell_chevy_to_start_vehicle.wav
             WAV2: /home/pi/wav/chevy_secret.wav
@@ -150,8 +215,6 @@ handlers:
             - sleep 7
             - echo #'espeak -w %WAV2 "super secret, one"'
             - _aplay2
-    button07:
-        cmd: _aplay
     button08:
         attrs: { in_sequence: false }
         cmds:
@@ -205,9 +268,38 @@ handlers:
     button20:
         vars: { ACTION: 'off' }
         cmd: _clapper_light
+    button21:
+        vars: { ACTION: 'on' }
+        cmd: _purpleroom_light
+    button22:
+        vars: { ACTION: 'off' }
+        cmd: _purpleroom_light
+    button25:
+        vars: { ACTION: 'on' }
+        cmd: _basementoffice_light
+    button26:
+        vars: { ACTION: 'off' }
+        cmd: _basementoffice_light
+    button27:
+        vars: { ACTION: 'on' }
+        cmd: _basementstairs_light
+    button28:
+        vars: { ACTION: 'off' }
+        cmd: _basementstairs_light
+    button29:
+        vars: { ACTION: 'on' }
+        cmd: _basementfront_light
+    button30:
+        vars: { ACTION: 'off' }
+        cmd: _basementfront_light
+    button31:
+        vars: { ACTION: 'on' }
+        cmd: _basementback_light
+    button32:
+        vars: { ACTION: 'off' }
+        cmd: _basementback_light
     button64:
-        vars: { TXT: "Alexa, what time is it?" }
-        cmd: _flite
+        cmd: echo 64
     battery:
         attrs: { log_output: true }
         cmds:
