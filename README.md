@@ -1,4 +1,4 @@
-#mqtt2cmd
+# mqtt2cmd
 #### Python based project to translate mqtt events into shell commands
 
 ## Goals
@@ -19,19 +19,19 @@ event. At first I considered using something like
 [Node-RED](https://nodered.org/), but then I realized that it was way
 too fancy. The end result is this project, which allows
 us to start mqtt2cmd manually or as a service. That makes it portable enough
-to be ran on anything that provides python; such as a Raspberry Pi.
-An example of how this can be useful would be:
+to be ran on anything that provides python; such as a Raspberry Pi. All easily
+done by changing a single yaml file. An example of how this can be useful would be:
 - React to a specific button push from [trelliswifi](https://github.com/flavio-fernandes/trelliswifi)
 and turn on the [sprinklers](https://opensprinkler.com/product/opensprinkler-pi/)
-via a [curl](https://www.codepedia.org/ama/how-to-test-a-rest-api-from-command-line-with-curl/);
+via a [curl](https://www.codepedia.org/ama/how-to-test-a-rest-api-from-command-line-with-curl/) command;
 - Aslo, as part of turning on the sprinklers on the same handler, make the RGB under
 the button in the trelliswifi turn green;
 - React to an mqtt event generated when there is motion in my garage by
 displaying a message in my [office display](http://flaviof.com/blog/hacks/office-clock-part2.html)
-via web;
+via rest;
 - React when the lights in the basement are on and have an indicator of that
 on my [bedclock](http://www.flaviof.com/blog2/post/hacks/bedclock/);
-- Basically glue together whatever mqtt events I want into new mqtt/rest events.
+- Map an mqtt event into with one or multiple mqtt/rest/bash actions.
 
 ## Installation
 
@@ -71,7 +71,7 @@ $ sudo systemctl enable mqtt2cmd.service
 $ sudo systemctl start mqtt2cmd.service
 ```
 
-#### VM via Vagarant
+#### Installation via Vagarant
 
 In order to easily have a VM running this project, take a
 look at the [Vagrantfile](https://github.com/flavio-fernandes/mqtt2cmd/blob/master/Vagrantfile).
