@@ -10,11 +10,20 @@
 mqtt:
     host: 192.168.10.238
 topics:
+    /mqtt2cmd:
+        'ping': mqtt2cmd_ping
+    /openweather/sunrise:
+        default: weather_sunrise
+    /openweather/sunset:
+        default: weather_sunset
+    /aio/weather/current:
+        default: weather_update
     /buttonbox2/buttons:
         '{"p":"0x0000000000000001","l":"0x0000000000000000","x":"0x0000000000000000"}': button01
         '{"p":"0x0000000000000002","l":"0x0000000000000000","x":"0x0000000000000000"}': button02
         '{"p":"0x0000000000000004","l":"0x0000000000000000","x":"0x0000000000000000"}': button03
         '{"p":"0x0000000000000008","l":"0x0000000000000000","x":"0x0000000000000000"}': button04
+        '{"p":"0x0000000000000000","l":"0x0000000000000008","x":"0x0000000000000000"}': button04long
         '{"p":"0x0000000000000010","l":"0x0000000000000000","x":"0x0000000000000000"}': button05
         '{"p":"0x0000000000000020","l":"0x0000000000000000","x":"0x0000000000000000"}': button06
         '{"p":"0x0000000000000040","l":"0x0000000000000000","x":"0x0000000000000000"}': button07
@@ -36,6 +45,8 @@ topics:
         '{"p":"0x0000000000080000","l":"0x0000000000000000","x":"0x0000000000000000"}': button20
         '{"p":"0x0000000000100000","l":"0x0000000000000000","x":"0x0000000000000000"}': button21
         '{"p":"0x0000000000200000","l":"0x0000000000000000","x":"0x0000000000000000"}': button22
+        # The following 2 buttons are handled outside this mqtt2cmd.
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl
         #'{"p":"0x0000000000400000","l":"0x0000000000000000","x":"0x0000000000000000"}': button23
         #'{"p":"0x0000000000800000","l":"0x0000000000000000","x":"0x0000000000000000"}': button24
 
@@ -47,6 +58,15 @@ topics:
         '{"p":"0x0000000020000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button30
         '{"p":"0x0000000040000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button31
         '{"p":"0x0000000080000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button32
+
+        '{"p":"0x0000000100000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button33
+        '{"p":"0x0000000200000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button34
+        '{"p":"0x0000000400000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button35
+        '{"p":"0x0000000800000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button36
+        '{"p":"0x0000001000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button37
+        '{"p":"0x0000002000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button38
+        #'{"p":"0x0000004000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button39
+        #'{"p":"0x0000008000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button40
 
         '{"p":"0x8000000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button64
     /buttonbox2/battery:
@@ -72,18 +92,29 @@ topics:
     /basementback/light_switch:
         'on':  basementback_light_is_on
         'off': basementback_light_is_off
-    /rf24/clapper/oper_flag/clapper_power:
+    /attic/light_switch:
+        'on':  attic_light_is_on
+        'off': attic_light_is_off
+    /clapper/light_switch:
         'on':  clapper_light_is_on
         'off': clapper_light_is_off
-    # HACK: we should only need /rf24/clapper/oper_flag/clapper_power
-    #       but rf24 is not very reliable, so we will pay attention
-    #       to the admin as well
-    /rf24/clapper/admin_flag/clapper_power:
-        'on':  clapper_light_is_on
-        'off': clapper_light_is_off
+    /garage_door/zelda:
+        'open': garage_door_zelda_is_open
+        'closed': garage_door_zelda_is_closed
+    /garage_door/zetsu:
+        'open': garage_door_zetsu_is_open
+        'closed': garage_door_zetsu_is_closed
 globals:
     PUB: mosquitto_pub -h 192.168.10.238 -t
     BBOX2: '%PUB /buttonbox2/cmd -m'
+    # https://www.w3schools.com/colors/colors_picker.asp
+    COLOR_WHITE: 7829367
+    COLOR_ORANGE: 15102720
+    COLOR_YELLOW: 7829248
+    COLOR_PURPLE: 7340144
+    COLOR_GREEN: 4096
+    COLOR_RED: 458752
+    COLOR_BLUE: 42
 handlers:
     _aplay:
         vars: { WAV: /home/pi/wav/alexa_tell_me_a_bad_joke.wav }
@@ -104,13 +135,19 @@ handlers:
               'http://127.0.0.1/ledStrip'
     _common_light_is_on:
         vars:
-            GREEN11: '''{"op" : "set", "id": %ON_PXL_ID, "pixelMask": [%ON_PXL], "color": 4096}'''
-            GREEN12: '''{"op" : "set", "id": %ON_PXL_ID, "animation": {"blink": 0, "pulse": 1}}'''
-            RED21:   '''{"op" : "set", "id": %OFF_PXL_ID, "pixelMask": [%OFF_PXL], "color": 458752}'''
-            RED22:   '''{"op" : "set", "id": %OFF_PXL_ID, "animation": {"dependsOn": %ON_PXL_ID}}'''
-        cmds: [ '%BBOX2 %GREEN11', '%BBOX2 %GREEN12', '%BBOX2 %RED21', '%BBOX2 %RED22' ]
+            ON_COLOR: '%COLOR_GREEN'
+            ONLED11: '''{"op" : "set", "id": %ON_PXL_ID, "pixelMask": [%ON_PXL], "color": %ON_COLOR}'''
+            ONLED12: '''{"op" : "set", "id": %ON_PXL_ID, "animation": {"blink": 0, "pulse": 1}}'''
+            OFF_COLOR: '%COLOR_RED'
+            OFFLED21:   '''{"op" : "set", "id": %OFF_PXL_ID, "pixelMask": [%OFF_PXL], "color": %OFF_COLOR}'''
+            OFFLED22:   '''{"op" : "set", "id": %OFF_PXL_ID, "animation": {"dependsOn": %ON_PXL_ID}}'''
+        cmds: [ '%BBOX2 %ONLED11', '%BBOX2 %ONLED12', '%BBOX2 %OFFLED21', '%BBOX2 %OFFLED22' ]
+    _clear_bg_msgs:
+        cmd: curl -X POST -d 'clearAll=1' http://127.0.0.1/msgBackground
+    _clear_bg_imgs:
+        cmd: curl -X POST -d "clearAll=1" http://127.0.0.1/imgBackground
     office_light_is_on:
-        vars: { ON_PXL: '1,0', OFF_PXL: '2,0', ON_PXL_ID: 100, OFF_PXL_ID: 101 }
+        vars: { ON_PXL: '1,0', OFF_PXL: '2,0', ON_PXL_ID: 100, OFF_PXL_ID: 101, ON_COLOR: '%COLOR_WHITE' }
         cmd: _common_light_is_on
     office_light_is_off:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 100}''' ]
@@ -119,9 +156,9 @@ handlers:
         cmds: [ '%PUB /office/light_switch -m %ACTION', echo office light action %ACTION ]
     masterroom_light_is_on:
         vars: { ON_PXL: '65536,0', OFF_PXL: '131072,0', ON_PXL_ID: 102, OFF_PXL_ID: 103 }
-        cmd: _common_light_is_on
+        cmds: [ '%PUB /bedclock/stay -m on', _common_light_is_on ]
     masterroom_light_is_off:
-        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 102}''' ]
+        cmds: [ '%PUB /bedclock/expire_stay -m 0', '%BBOX2 ''{"op" : "rm", "id": 102}''' ]
     _masterroom_light:
         vars: { ACTION: 'toggle' }
         cmds: [ '%PUB /masterroom/light_switch -m %ACTION', echo masterroom light action %ACTION ]
@@ -132,9 +169,9 @@ handlers:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 104}''' ]
     _clapper_light:
         vars: { ACTION: 'toggle' }
-        cmds: [ '%PUB /rf24/clapper/admin_flag/clapper_power -m %ACTION', echo clapper light action %ACTION ]
+        cmds: [ '%PUB /clapper/light_switch -m %ACTION', echo clapper light action %ACTION ]
     purpleroom_light_is_on:
-        vars: { ON_PXL: '1048576,0', OFF_PXL: '2097152,0', ON_PXL_ID: 106, OFF_PXL_ID: 107 }
+        vars: { ON_PXL: '1048576,0', OFF_PXL: '2097152,0', ON_PXL_ID: 106, OFF_PXL_ID: 107, ON_COLOR: '%COLOR_PURPLE' }
         cmd: _common_light_is_on
     purpleroom_light_is_off:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 106}''' ]
@@ -173,6 +210,27 @@ handlers:
     _basementback_light:
         vars: { ACTION: 'toggle' }
         cmds: [ '%PUB /basementback/light_switch -m %ACTION', echo basementback light action %ACTION ]
+    attic_light_is_on:
+        vars: { ON_PXL: '0,1', OFF_PXL: '0,2', ON_PXL_ID: 116, OFF_PXL_ID: 117, ON_COLOR: '%COLOR_YELLOW' }
+        cmd: _common_light_is_on
+    attic_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 116}''' ]
+    _attic_light:
+        vars: { ACTION: 'toggle' }
+        cmds: [ '%PUB /attic/light_switch -m %ACTION', echo attic light action %ACTION ]
+    garage_door_zelda_is_open:
+        vars: { ON_PXL: '0,4', OFF_PXL: '0,8', ON_PXL_ID: 118, OFF_PXL_ID: 119, ON_COLOR: '%COLOR_ORANGE' }
+        cmd: _common_light_is_on
+    garage_door_zelda_is_closed:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 118}''' ]
+    garage_door_zetsu_is_open:
+        vars: { ON_PXL: '0,16', OFF_PXL: '0,32', ON_PXL_ID: 120, OFF_PXL_ID: 121, ON_COLOR: '%COLOR_ORANGE' }
+        cmd: _common_light_is_on
+    garage_door_zetsu_is_closed:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 120}''' ]
+    _garage_door:
+        vars: { ACTION: 'ping', DOOR: '' }
+        cmds: [ '%PUB /garage_door%DOOR -m %ACTION', echo garage door %DOOR action %ACTION ]
     button01:
         vars: { ACTION: 'on' }
         cmd: _office_light
@@ -182,25 +240,97 @@ handlers:
     button03:
         attrs: { in_sequence: false }
         cmds:
+            - _clear_bg_msgs
             - >-
               curl -X POST -d
               'msg=#cookie&color=2&y=5&repeats=0&bounce=no&font=2&confetti=25'
               http://127.0.0.1/msgMode
             - espeak -v en-sc "message"
-    button04:
+    weather_sun:
         vars:
-            MSG: bouncing message, bounce
-            TIMEOUT: 20
-            X: 7
+            I_ANIM: '&animationStep=5&animationPhase=2&animationPhaseValue=%I_ANIM_IDX'
+            I_PRE_: 'curl -X POST -d "imgArt=%SUN_IMG&index=%BG_IMG_IDX'
+            I_SUF: '%I_ANIM&color=%SUN_COLOR&enabled=yes" http://127.0.0.1/imgBackground'
+            M_ANIM: '&animationStep=5&animationPhase=4'
+            M1_PRE_: 'curl -X POST -d "index=%BG_MSG1_IDX&msg=%payload'
+            M1_SUF: '%M_ANIM&animationPhaseValue=%M1_ANIM_IDX&color=%SUN_COLOR&enabled=yes" http://127.0.0.1/msgBackground'
+            M2_PRE_: 'curl -X POST -d "index=%BG_MSG2_IDX&msg=%BG_MSG2'
+            M2_SUF: '%M_ANIM&animationPhaseValue=%M2_ANIM_IDX&color=%SUN_COLOR&enabled=yes" http://127.0.0.1/msgBackground'
+        cmds:
+            - '%M1_PRE_&x=107&y=9%M1_SUF'
+            - '%M2_PRE_&x=107&y=9%M2_SUF'
+            - echo '%M2_PRE_&x=80&y=9%M2_SUF'
+            - echo '%I_PRE_&x=101&y=9%I_SUF'
+    mqtt2cmd_ping:
+        cmd: '%PUB %topic -m "pong at %create_ts"'
+    weather_sunrise:
+        vars:
+            I_ANIM_IDX: 0
+            BG_IMG_IDX: 0
+            M1_ANIM_IDX: 1
+            M2_ANIM_IDX: 0
+            BG_MSG1_IDX: 9
+            BG_MSG2_IDX: 10
+            BG_MSG2: "dawn "
+            SUN_COLOR: 2
+            SUN_IMG: 35
+        cmd: weather_sun
+    weather_sunset:
+        vars:
+            I_ANIM_IDX: 1
+            BG_IMG_IDX: 1
+            M1_ANIM_IDX: 3
+            M2_ANIM_IDX: 2
+            BG_MSG1_IDX: 11
+            BG_MSG2_IDX: 12
+            BG_MSG2: "dusk "
+            SUN_COLOR: 1
+            SUN_IMG: 39
+        cmd: weather_sun
+    weather_update:
+        vars:
+            PRE_: 'curl -X POST -d "msg='
+            _SUF: '&font=0&enabled=yes" http://127.0.0.1/msgBackground'
+            SUFG: '&color=0%_SUF'
+            SUFR: '&color=1%_SUF'
+        cmds:
+            - '%PRE_Wind&x=0&y=1&index=0%SUFR'
+            - '%PRE_%windSpeed&x=21&y=1&index=1%SUFG'
+            - '%PRE_Precip&x=42&y=1&index=2%SUFR'
+            - '%PRE_%precipProbabilityPercent&x=68&y=1&index=3%SUFG'
+            - '%PRE_Dist&x=95&y=1&index=4%SUFR'
+            - '%PRE_%nearestStormDistance&x=113&y=1&index=5%SUFG'
+            - '%PRE_Dew&x=0&y=9&index=6%SUFR'
+            - '%PRE_%dewPoint&x=15&y=9&index=7%SUFG'
+            - '%PRE_%summary&x=42&y=9&index=8%SUFR'
+        noop:
+            - >-
+              curl -X POST -d
+              'msg=Weather&repeats=1&bounce=no&y=0&font=4&color=2'
+              http://127.0.0.1/msgMode
+            - >-
+              curl -X POST -d
+              'msg=Weather&repeats=2&y=0&font=4&color=2'
+              http://127.0.0.1/msgMode
+    button04:
         cmds:
             - >-
               curl -X POST -d
-              "msg=%MSG&noScroll=1&bounce=1&timeout=%TIMEOUT&x=%X"
+              'msg=Weather&repeats=4&timeout=0&y=0&font=4&color=2'
+              http://127.0.0.1/msgMode
+    button04long:
+        vars:
+            ADA_WORD: "#dict_/aio/words"
+        cmds:
+            - _clear_bg_msgs
+            - >-
+              curl -X POST -d
+              'msg=%ADA_WORD&noScroll=1&font=3&color=2&x=2&y=7&timeout=60'
               http://127.0.0.1/msgMode
     button05:
-        attrs: { stop_on_failure: false, timeout: 13 }
+        attrs: { stop_on_failure: false, timeout: 13, in_sequence: true }
         # stickman script is sticky. We need timeout to kill it
-        cmds: [ /home/pi/oclock.git/misc/stickManAnimation.sh ]
+        cmds: [ _clear_bg_msgs, /home/pi/oclock.git/misc/stickManAnimation.sh ]
     button06:
         cmd: _aplay
     button07:
@@ -212,15 +342,15 @@ handlers:
             WAV2: /home/pi/wav/chevy_secret.wav
         cmds:
             - _aplay
-            - sleep 7
+            - sleep 9
             - echo #'espeak -w %WAV2 "super secret, one"'
             - _aplay2
     button08:
         attrs: { in_sequence: false }
         cmds:
             - curl -X POST -d "msg=.&timeout=3" http://127.0.0.1/msgMode
-            - curl -X POST -d "clearAll=1" http://127.0.0.1/msgBackground
-            - curl -X POST -d "clearAll=1" http://127.0.0.1/imgBackground
+            - _clear_bg_msgs
+            - _clear_bg_imgs
     button09:
         vars:
             STRIP_DATA: "'ledStripMode=2&red=127&green=0&blue=0&timeout=7200'"
@@ -255,7 +385,7 @@ handlers:
         cmd: _ledStrip
     button16:
         # clear led strip
-        cmd: _ledStrip
+        cmds: [ _ledStrip, sleep 3, _ledStrip ]
     button17:
         vars: { ACTION: 'on' }
         cmd: _masterroom_light
@@ -274,6 +404,10 @@ handlers:
     button22:
         vars: { ACTION: 'off' }
         cmd: _purpleroom_light
+    #button23:
+    #    cmd: echo mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl
+    #button24:
+    #    cmd: echo mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl
     button25:
         vars: { ACTION: 'on' }
         cmd: _basementoffice_light
@@ -298,6 +432,24 @@ handlers:
     button32:
         vars: { ACTION: 'off' }
         cmd: _basementback_light
+    button33:
+        vars: { ACTION: 'on' }
+        cmd: _attic_light
+    button34:
+        vars: { ACTION: 'off' }
+        cmd: _attic_light
+    button35:
+        vars: { ACTION: 'open', DOOR: '/zelda' }
+        cmd: _garage_door
+    button36:
+        vars: { ACTION: 'closed', DOOR: '/zelda' }
+        cmd: _garage_door
+    button37:
+        vars: { ACTION: 'open', DOOR: '/zetsu' }
+        cmd: _garage_door
+    button38:
+        vars: { ACTION: 'closed', DOOR: '/zetsu' }
+        cmd: _garage_door
     button64:
         cmd: echo 64
     battery:
