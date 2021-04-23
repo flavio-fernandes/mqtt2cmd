@@ -262,7 +262,7 @@ handlers:
             - echo '%M2_PRE_&x=80&y=9%M2_SUF'
             - echo '%I_PRE_&x=101&y=9%I_SUF'
     mqtt2cmd_ping:
-        cmd: '%PUB %topic -m "pong at %create_ts"'
+        cmd: '%PUB %topic -r -m "pong at %create_ts"'
     weather_sunrise:
         vars:
             I_ANIM_IDX: 0

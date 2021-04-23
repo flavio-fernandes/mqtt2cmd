@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for check_mqtt2cmd service
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=10min
+RandomizedDelaySec=13
+
+[Install]
+WantedBy=timers.target

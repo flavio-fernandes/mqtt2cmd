@@ -1,0 +1,8 @@
+[Unit]
+Description=Checker for MQTT based command dispatcher
+
+[Service]
+User=pi
+Type=oneshot
+ExecStart=/bin/bash /home/pi/mqtt2cmd.git/mqtt2cmd/bin/check_mqtt2cmd.sh
+Restart=no
