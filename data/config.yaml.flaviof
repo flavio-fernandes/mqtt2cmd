@@ -65,8 +65,24 @@ topics:
         '{"p":"0x0000000800000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button36
         '{"p":"0x0000001000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button37
         '{"p":"0x0000002000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button38
-        #'{"p":"0x0000004000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button39
-        #'{"p":"0x0000008000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button40
+       #'{"p":"0x0000004000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button39 available!
+       #'{"p":"0x0000008000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button40 available!
+
+        '{"p":"0x0000010000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button41
+        '{"p":"0x0000000000000000","l":"0x0000010000000000","x":"0x0000000000000000"}': button41_long
+        '{"p":"0x0000030000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button41_and_42
+        '{"p":"0x0000000000000000","l":"0x0000030000000000","x":"0x0000000000000000"}': button41_long_and_42_long
+        '{"p":"0x0000050000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button41_and_43
+        '{"p":"0x0000020000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button42
+        '{"p":"0x0000000000000000","l":"0x0000020000000000","x":"0x0000000000000000"}': button42_long
+        '{"p":"0x00000a0000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button42_and_44
+        '{"p":"0x0000040000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button43
+        '{"p":"0x0000080000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button44
+        '{"p":"0x0000000000000000","l":"0x0000080000000000","x":"0x0000000000000000"}': button44_long
+       #'{"p":"0x0000100000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button45
+       #'{"p":"0x0000200000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button46
+       #'{"p":"0x0000400000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button47
+       #'{"p":"0x0000800000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button48
 
         '{"p":"0x8000000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button64
     /buttonbox2/battery:
@@ -98,12 +114,28 @@ topics:
     /clapper/light_switch:
         'on':  clapper_light_is_on
         'off': clapper_light_is_off
+    /garage_door/zen:
+        'open': garage_door_zen_is_open
+        'closed': garage_door_zen_is_closed
     /garage_door/zelda:
         'open': garage_door_zelda_is_open
         'closed': garage_door_zelda_is_closed
-    /garage_door/zetsu:
-        'open': garage_door_zetsu_is_open
-        'closed': garage_door_zetsu_is_closed
+    /buttonbox1/buttons:
+        '4097': button1_red_grey
+        '4112': button1_red_yellow
+        '4336': button1_red_yellow_long
+        '61680': button1_red_long_yellow_long
+        '4352': button1_red_green
+        '7936': button1_red_green_long
+    smokey/state/light:
+        'on':  smokey_light_is_on
+        'off': smokey_light_is_off
+    smokey/state/diffuser:
+        'on':  smokey_diffuser_is_on
+        'off': smokey_diffuser_is_off
+    smokey/stat/error:
+        '0X00': smokey_is_ok
+        default: smokey_needs_attention
 globals:
     PUB: mosquitto_pub -h 192.168.10.238 -t
     BBOX2: '%PUB /buttonbox2/cmd -m'
@@ -115,6 +147,8 @@ globals:
     COLOR_GREEN: 4096
     COLOR_RED: 458752
     COLOR_BLUE: 42
+    SMOKEY_PREFIX: 'curl --location --request POST http://192.168.10.230:8080'
+    SMOKEY_COMMON_HEADER: '--header "Content-Type: application/x-www-form-urlencoded"'
 handlers:
     _aplay:
         vars: { WAV: /home/pi/wav/alexa_tell_me_a_bad_joke.wav }
@@ -135,9 +169,10 @@ handlers:
               'http://127.0.0.1/ledStrip'
     _common_light_is_on:
         vars:
+            ONLED1_ANIMATION: '{"blink": 0, "pulse": 1}'
             ON_COLOR: '%COLOR_GREEN'
             ONLED11: '''{"op" : "set", "id": %ON_PXL_ID, "pixelMask": [%ON_PXL], "color": %ON_COLOR}'''
-            ONLED12: '''{"op" : "set", "id": %ON_PXL_ID, "animation": {"blink": 0, "pulse": 1}}'''
+            ONLED12: '''{"op" : "set", "id": %ON_PXL_ID, "animation": %ONLED1_ANIMATION}'''
             OFF_COLOR: '%COLOR_RED'
             OFFLED21:   '''{"op" : "set", "id": %OFF_PXL_ID, "pixelMask": [%OFF_PXL], "color": %OFF_COLOR}'''
             OFFLED22:   '''{"op" : "set", "id": %OFF_PXL_ID, "animation": {"dependsOn": %ON_PXL_ID}}'''
@@ -218,19 +253,36 @@ handlers:
     _attic_light:
         vars: { ACTION: 'toggle' }
         cmds: [ '%PUB /attic/light_switch -m %ACTION', echo attic light action %ACTION ]
-    garage_door_zelda_is_open:
+    garage_door_zen_is_open:
         vars: { ON_PXL: '0,4', OFF_PXL: '0,8', ON_PXL_ID: 118, OFF_PXL_ID: 119, ON_COLOR: '%COLOR_ORANGE' }
         cmd: _common_light_is_on
-    garage_door_zelda_is_closed:
+    garage_door_zen_is_closed:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 118}''' ]
-    garage_door_zetsu_is_open:
+    garage_door_zelda_is_open:
         vars: { ON_PXL: '0,16', OFF_PXL: '0,32', ON_PXL_ID: 120, OFF_PXL_ID: 121, ON_COLOR: '%COLOR_ORANGE' }
         cmd: _common_light_is_on
-    garage_door_zetsu_is_closed:
+    garage_door_zelda_is_closed:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 120}''' ]
     _garage_door:
         vars: { ACTION: 'ping', DOOR: '' }
         cmds: [ '%PUB /garage_door%DOOR -m %ACTION', echo garage door %DOOR action %ACTION ]
+    smokey_light_is_on:
+        vars: { ON_PXL: '0,256', OFF_PXL: '0,512', ON_PXL_ID: 124, OFF_PXL_ID: 125, ON_COLOR: '%COLOR_PURPLE', ONLED1_ANIMATION: '{"pulse": 0}' }
+        cmd: _common_light_is_on
+    smokey_light_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 124}''' ]
+    smokey_diffuser_is_on:
+        vars: { ON_PXL: '0,1024', OFF_PXL: '0,2048', ON_PXL_ID: 126, OFF_PXL_ID: 127, ON_COLOR: '%COLOR_BLUE', ONLED1_ANIMATION: '{"pulse": 0}' }
+        cmd: _common_light_is_on
+    smokey_diffuser_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 126}''' ]
+    smokey_needs_attention:
+        vars:
+            LEDS11: '''{"op" : "set", "id": 128, "pixelMask": [0,3840], "color": %COLOR_RED}'''
+            LEDS12: '''{"op" : "set", "id": 128, "animation": {"blink": 1}}'''
+        cmds: [ '%BBOX2 %LEDS11', '%BBOX2 %LEDS12' ]
+    smokey_is_ok:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 128}''' ]
     button01:
         vars: { ACTION: 'on' }
         cmd: _office_light
@@ -338,8 +390,8 @@ handlers:
         cmd: _flite
     button6and7:
         vars:
-            WAV: /home/pi/wav/alexa_tell_chevy_to_start_vehicle.wav
-            WAV2: /home/pi/wav/chevy_secret.wav
+            DEPRECATED_WAV: /home/pi/wav/alexa_tell_chevy_to_start_vehicle.wav
+            DEPRECATED_WAV2: /home/pi/wav/chevy_secret.wav
         cmds:
             - _aplay
             - sleep 9
@@ -352,10 +404,12 @@ handlers:
             - _clear_bg_msgs
             - _clear_bg_imgs
     button09:
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- node_kitchen_steps
         vars:
             STRIP_DATA: "'ledStripMode=2&red=127&green=0&blue=0&timeout=7200'"
         cmd: _ledStrip
     button10:
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- node_garage
         vars:
             STRIP_DATA: "'ledStripMode=2&red=0&green=127&blue=0&timeout=7200'"
         cmd: _ledStrip
@@ -439,20 +493,127 @@ handlers:
         vars: { ACTION: 'off' }
         cmd: _attic_light
     button35:
-        vars: { ACTION: 'open', DOOR: '/zelda' }
+        vars: { ACTION: 'open', DOOR: '/zen' }
         cmd: _garage_door
     button36:
-        vars: { ACTION: 'closed', DOOR: '/zelda' }
+        vars: { ACTION: 'closed', DOOR: '/zen' }
         cmd: _garage_door
     button37:
-        vars: { ACTION: 'open', DOOR: '/zetsu' }
+        vars: { ACTION: 'open', DOOR: '/zelda' }
         cmd: _garage_door
     button38:
-        vars: { ACTION: 'closed', DOOR: '/zetsu' }
+        vars: { ACTION: 'closed', DOOR: '/zelda' }
         cmd: _garage_door
+    #button39:
+    #   cmd: available!
+    #   pixel: [0,64]   id: 122
+    #button40:
+    #   cmd: available!
+    #   pixel: [0,128]  id: 123
+    button41:
+        # smokey light on random
+        cmd: button1_red_yellow
+    button41_long:
+        # smokey light on red dimmed
+        cmd: button1_red_yellow_long
+    button41_and_42:
+        # smokey night light
+        vars:
+            AUTO_OFF: '--data-urlencode "autoOffSecs=28800"'
+            MODE: '--data-urlencode "mode=night-mode"'
+            CMD: lighton
+            DATA: '%AUTO_OFF %MODE'
+        cmd: _smokey_command
+    button41_long_and_42_long:
+        # smokey crazy light
+        cmd: button1_red_long_yellow_long
+    button41_and_43:
+        # button41 and smokey diffuser on via cmd2
+        vars:
+            CMD2: smokeon
+            DATA2: '--data-urlencode "autoOffSecs=3600"'
+        cmds: [ button41, _smokey_command2 ]
+    button42:
+        # smokey light off
+        cmd: button1_red_grey
+    button42_long:
+        cmd: button42_and_44
+    button42_and_44:
+        # light off and smokey diffuser off via cmd2
+        vars:
+            CMD: lightoff
+            CMD2: smokeoff
+        cmds: [ _smokey_command, _smokey_command2 ]
+    button43:
+        # smokey diffuser on
+        vars:
+            CMD: smokeon
+            DATA: '--data-urlencode "autoOffSecs=3600"'
+        cmd: _smokey_command
+    button44:
+        # smokey diffuser off
+        cmd: button1_red_green
+    button44_long:
+        cmds: button42_and_44
     button64:
         cmd: echo 64
     battery:
         attrs: { log_output: true }
         cmds:
-            - echo battery has %volts volts. low is set to %isLow
+            - echo %topic battery has %volts volts. low is set to %isLow
+    _smokey_command:
+        vars: { DATA: ' ' }
+        cmd: '%SMOKEY_PREFIX/%CMD %SMOKEY_COMMON_HEADER %DATA'
+    _smokey_command2:
+        vars: { DATA2: ' ' }
+        cmd: '%SMOKEY_PREFIX/%CMD2 %SMOKEY_COMMON_HEADER %DATA2'
+    button1_red_grey:
+        vars: { CMD: lightoff }
+        cmds:
+            - echo %topic and %payload turn smokey light off
+            - _smokey_command
+    button1_red_yellow:
+        vars:
+            AUTO_OFF: '--data-urlencode "autoOffSecs=3600"'
+            MODE_SOLID: '--data-urlencode "mode=solid"'
+            COLOR_VALUE: '--data-urlencode "color=random"'
+            CMD: lighton
+            DATA: '%AUTO_OFF %MODE_SOLID %COLOR_VALUE'
+        cmds:
+            - echo %topic and %payload turn smokey light on random
+            - _smokey_command
+    button1_red_yellow_long:
+        vars:
+            AUTO_OFF: '--data-urlencode "autoOffSecs=7200"'
+            MODE_SOLID: '--data-urlencode "mode=solid"'
+            COLOR_VALUE: '--data-urlencode "color=red"'
+            CMD: lighton
+            DATA: '%AUTO_OFF %MODE_SOLID %COLOR_VALUE'
+            CMD2: lightdim
+            DATA2: '--data-urlencode "dim=5"'
+        cmds:
+            - echo %topic and %payload turn smokey light on red dimmed
+            - _smokey_command
+            - _smokey_command2
+    button1_red_long_yellow_long:
+        # smokey crazy light
+        vars:
+            CMD: lighton
+            DATA: '--data-urlencode "mode=crazy"'
+        cmd: _smokey_command
+    button1_red_green:
+        vars: { CMD: smokeoff }
+        cmds:
+            - echo %topic and %payload turn smokey diffuser off
+            - _smokey_command
+    button1_red_green_long:
+        vars:
+            AUTO_OFF: '--data-urlencode "autoOffSecs=3600"'
+            CMD: lighton
+            DATA: '%AUTO_OFF --data-urlencode "mode=crazy"'
+            CMD2: smokeon
+            DATA2: '%AUTO_OFF'
+        cmds:
+            - echo %topic and %payload turn smokey crazy light and difuser
+            - _smokey_command
+            - _smokey_command2
