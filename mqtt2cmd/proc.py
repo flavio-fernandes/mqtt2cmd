@@ -50,7 +50,7 @@ class Group:
 
         handle = subprocess.Popen(cmd,
                                   shell=shell,
-                                  bufsize=1,
+                                  # bufsize=1,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.STDOUT,
                                   # needed to detach from calling terminal (other wacky things
