@@ -71,7 +71,7 @@ $ sudo systemctl enable mqtt2cmd.service
 $ sudo systemctl start mqtt2cmd.service
 ```
 
-#### Installation via Vagarant
+#### Installation via Vagrant
 
 In order to easily have a VM running this project, take a
 look at the [Vagrantfile](https://github.com/flavio-fernandes/mqtt2cmd/blob/master/Vagrantfile).

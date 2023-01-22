@@ -16,6 +16,10 @@ topics:
         default: weather_sunrise
     /openweather/sunset:
         default: weather_sunset
+    /openweather/temp_min:
+        default: weather_temp_min
+    /openweather/temp_max:
+        default: weather_temp_max
     /aio/weather/current:
         default: weather_update
     /buttonbox2/buttons:
@@ -79,10 +83,21 @@ topics:
         '{"p":"0x0000040000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button43
         '{"p":"0x0000080000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button44
         '{"p":"0x0000000000000000","l":"0x0000080000000000","x":"0x0000000000000000"}': button44_long
-       #'{"p":"0x0000100000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button45
-       #'{"p":"0x0000200000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button46
-       #'{"p":"0x0000400000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button47
-       #'{"p":"0x0000800000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button48
+        '{"p":"0x0000100000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button45
+        '{"p":"0x0000200000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button46
+        '{"p":"0x0000300000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button45_and_46
+        '{"p":"0x0000400000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button47
+        '{"p":"0x0000800000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button48
+        '{"p":"0x0000c00000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button47_and_48
+
+       #'{"p":"0x0001000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button49
+       #'{"p":"0x0002000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button50
+       #'{"p":"0x0004000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button51
+       #'{"p":"0x0008000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button52
+       #'{"p":"0x0010000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button53
+       #'{"p":"0x0020000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button54
+       #'{"p":"0x0040000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button55
+       #'{"p":"0x0080000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button56
 
         '{"p":"0x8000000000000000","l":"0x0000000000000000","x":"0x0000000000000000"}': button64
     /buttonbox2/battery:
@@ -136,6 +151,12 @@ topics:
     smokey/stat/error:
         '0X00': smokey_is_ok
         default: smokey_needs_attention
+    /onoffpins/oper_flag/playground1:
+        'on':  onoffpins_playground1_is_on
+        'off': onoffpins_playground1_is_off
+    /onoffpins/oper_flag/playground2:
+        'on':  onoffpins_playground2_is_on
+        'off': onoffpins_playground2_is_off
 globals:
     PUB: mosquitto_pub -h 192.168.10.238 -t
     BBOX2: '%PUB /buttonbox2/cmd -m'
@@ -149,6 +170,7 @@ globals:
     COLOR_BLUE: 42
     SMOKEY_PREFIX: 'curl --location --request POST http://192.168.10.230:8080'
     SMOKEY_COMMON_HEADER: '--header "Content-Type: application/x-www-form-urlencoded"'
+    WEATHER_DISPLAY_APP: /home/pi/oclock.git/misc/weatherMsg.sh
 handlers:
     _aplay:
         vars: { WAV: /home/pi/wav/alexa_tell_me_a_bad_joke.wav }
@@ -266,6 +288,11 @@ handlers:
     _garage_door:
         vars: { ACTION: 'ping', DOOR: '' }
         cmds: [ '%PUB /garage_door%DOOR -m %ACTION', echo garage door %DOOR action %ACTION ]
+    # unused_button39_pair_on: available!
+    #     vars: { ON_PXL: '0,64', OFF_PXL: '0,128', ON_PXL_ID: 122, OFF_PXL_ID: 123 }
+    #     cmd: _common_light_is_on
+    # unused_button40_pair_off: available!
+    #     cmds: [ '%BBOX2 ''{"op" : "rm", "id": 122}''' ]
     smokey_light_is_on:
         vars: { ON_PXL: '0,256', OFF_PXL: '0,512', ON_PXL_ID: 124, OFF_PXL_ID: 125, ON_COLOR: '%COLOR_PURPLE', ONLED1_ANIMATION: '{"pulse": 0}' }
         cmd: _common_light_is_on
@@ -283,6 +310,17 @@ handlers:
         cmds: [ '%BBOX2 %LEDS11', '%BBOX2 %LEDS12' ]
     smokey_is_ok:
         cmds: [ '%BBOX2 ''{"op" : "rm", "id": 128}''' ]
+    # skipping id 129 "id": 129 to start next block in even number
+    onoffpins_playground1_is_on:
+        vars: { ON_PXL: '0,4096', OFF_PXL: '0,8192', ON_PXL_ID: 130, OFF_PXL_ID: 131 }
+        cmd: _common_light_is_on
+    onoffpins_playground1_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 130}''' ]
+    onoffpins_playground2_is_on:
+        vars: { ON_PXL: '0,16384', OFF_PXL: '0,32768', ON_PXL_ID: 132, OFF_PXL_ID: 133 }
+        cmd: _common_light_is_on
+    onoffpins_playground2_is_off:
+        cmds: [ '%BBOX2 ''{"op" : "rm", "id": 132}''' ]
     button01:
         vars: { ACTION: 'on' }
         cmd: _office_light
@@ -290,6 +328,8 @@ handlers:
         vars: { ACTION: 'off' }
         cmd: _office_light
     button03:
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- onoffpins shed
+        # the light for button 3 will be controlled remotely
         attrs: { in_sequence: false }
         cmds:
             - _clear_bg_msgs
@@ -298,78 +338,42 @@ handlers:
               'msg=#cookie&color=2&y=5&repeats=0&bounce=no&font=2&confetti=25'
               http://127.0.0.1/msgMode
             - espeak -v en-sc "message"
-    weather_sun:
-        vars:
-            I_ANIM: '&animationStep=5&animationPhase=2&animationPhaseValue=%I_ANIM_IDX'
-            I_PRE_: 'curl -X POST -d "imgArt=%SUN_IMG&index=%BG_IMG_IDX'
-            I_SUF: '%I_ANIM&color=%SUN_COLOR&enabled=yes" http://127.0.0.1/imgBackground'
-            M_ANIM: '&animationStep=5&animationPhase=4'
-            M1_PRE_: 'curl -X POST -d "index=%BG_MSG1_IDX&msg=%payload'
-            M1_SUF: '%M_ANIM&animationPhaseValue=%M1_ANIM_IDX&color=%SUN_COLOR&enabled=yes" http://127.0.0.1/msgBackground'
-            M2_PRE_: 'curl -X POST -d "index=%BG_MSG2_IDX&msg=%BG_MSG2'
-            M2_SUF: '%M_ANIM&animationPhaseValue=%M2_ANIM_IDX&color=%SUN_COLOR&enabled=yes" http://127.0.0.1/msgBackground'
-        cmds:
-            - '%M1_PRE_&x=107&y=9%M1_SUF'
-            - '%M2_PRE_&x=107&y=9%M2_SUF'
-            - echo '%M2_PRE_&x=80&y=9%M2_SUF'
-            - echo '%I_PRE_&x=101&y=9%I_SUF'
     mqtt2cmd_ping:
         cmd: '%PUB %topic -r -m "pong at %create_ts"'
     weather_sunrise:
-        vars:
-            I_ANIM_IDX: 0
-            BG_IMG_IDX: 0
-            M1_ANIM_IDX: 1
-            M2_ANIM_IDX: 0
-            BG_MSG1_IDX: 9
-            BG_MSG2_IDX: 10
-            BG_MSG2: "dawn "
-            SUN_COLOR: 2
-            SUN_IMG: 35
-        cmd: weather_sun
+        cmd: '%WEATHER_DISPLAY_APP dawn "%payload"'
     weather_sunset:
-        vars:
-            I_ANIM_IDX: 1
-            BG_IMG_IDX: 1
-            M1_ANIM_IDX: 3
-            M2_ANIM_IDX: 2
-            BG_MSG1_IDX: 11
-            BG_MSG2_IDX: 12
-            BG_MSG2: "dusk "
-            SUN_COLOR: 1
-            SUN_IMG: 39
-        cmd: weather_sun
+        cmd: '%WEATHER_DISPLAY_APP dusk "%payload"'
+    weather_temp_min:
+        cmd: '%WEATHER_DISPLAY_APP tempMin "%payload"'
+    weather_temp_max:
+        cmd: '%WEATHER_DISPLAY_APP tempMax "%payload"'
     weather_update:
-        vars:
-            PRE_: 'curl -X POST -d "msg='
-            _SUF: '&font=0&enabled=yes" http://127.0.0.1/msgBackground'
-            SUFG: '&color=0%_SUF'
-            SUFR: '&color=1%_SUF'
         cmds:
-            - '%PRE_Wind&x=0&y=1&index=0%SUFR'
-            - '%PRE_%windSpeed&x=21&y=1&index=1%SUFG'
-            - '%PRE_Precip&x=42&y=1&index=2%SUFR'
-            - '%PRE_%precipProbabilityPercent&x=68&y=1&index=3%SUFG'
-            - '%PRE_Dist&x=95&y=1&index=4%SUFR'
-            - '%PRE_%nearestStormDistance&x=113&y=1&index=5%SUFG'
-            - '%PRE_Dew&x=0&y=9&index=6%SUFR'
-            - '%PRE_%dewPoint&x=15&y=9&index=7%SUFG'
-            - '%PRE_%summary&x=42&y=9&index=8%SUFR'
-        noop:
+            - echo weather update
             - >-
-              curl -X POST -d
-              'msg=Weather&repeats=1&bounce=no&y=0&font=4&color=2'
-              http://127.0.0.1/msgMode
-            - >-
-              curl -X POST -d
-              'msg=Weather&repeats=2&y=0&font=4&color=2'
-              http://127.0.0.1/msgMode
+              '%WEATHER_DISPLAY_APP'
+              summary "%summary"
+              nearestStormDistance "%nearestStormDistance"
+              precipIntensity "%precipIntensity"
+              temperature "%temperature"
+              apparentTemperature "%apparentTemperature"
+              dewPoint "%dewPoint"
+              humidity "%humidity"
+              pressure "%pressure"
+              windSpeed "%windSpeed"
+              windDeg "%windDeg"
+              windGust "%windGust"
+              cloudCover "%cloudCover"
+              uvIndex "%uvIndex"
+              visibility "%visibility"
+              ozone "%ozone"
+              precipProbabilityPercent "%precipProbabilityPercent"
     button04:
-        cmds:
-            - >-
-              curl -X POST -d
-              'msg=Weather&repeats=4&timeout=0&y=0&font=4&color=2'
-              http://127.0.0.1/msgMode
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- onoffpins backyard camera
+        # the light for button 4 will be controlled remotely
+        attrs: { stop_on_failure: false, timeout: 30, in_sequence: true }
+        cmds: [ '%WEATHER_DISPLAY_APP' ]
     button04long:
         vars:
             ADA_WORD: "#dict_/aio/words"
@@ -380,6 +384,8 @@ handlers:
               'msg=%ADA_WORD&noScroll=1&font=3&color=2&x=2&y=7&timeout=60'
               http://127.0.0.1/msgMode
     button05:
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- ev charger
+        # the light for button 5 will be controlled remotely
         attrs: { stop_on_failure: false, timeout: 13, in_sequence: true }
         # stickman script is sticky. We need timeout to kill it
         cmds: [ _clear_bg_msgs, /home/pi/oclock.git/misc/stickManAnimation.sh ]
@@ -389,14 +395,8 @@ handlers:
         vars: { TXT: "Alexa, what time is it?" }
         cmd: _flite
     button6and7:
-        vars:
-            DEPRECATED_WAV: /home/pi/wav/alexa_tell_chevy_to_start_vehicle.wav
-            DEPRECATED_WAV2: /home/pi/wav/chevy_secret.wav
-        cmds:
-            - _aplay
-            - sleep 9
-            - echo #'espeak -w %WAV2 "super secret, one"'
-            - _aplay2
+        vars: { TXT: "Alexa, who is the coolest person in the world?" }
+        cmd: _flite
     button08:
         attrs: { in_sequence: false }
         cmds:
@@ -404,20 +404,26 @@ handlers:
             - _clear_bg_msgs
             - _clear_bg_imgs
     button09:
-        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- node_kitchen_steps
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- motion
+        # the light for button 9 will be controlled remotely
         vars:
             STRIP_DATA: "'ledStripMode=2&red=127&green=0&blue=0&timeout=7200'"
         cmd: _ledStrip
     button10:
-        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- node_garage
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- motion
+        # the light for button 10 will be controlled remotely
         vars:
             STRIP_DATA: "'ledStripMode=2&red=0&green=127&blue=0&timeout=7200'"
         cmd: _ledStrip
     button11:
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- zwave
+        # the light for button 11 will be controlled remotely
         vars:
             STRIP_DATA: "'ledStripMode=2&red=0&green=0&blue=127&timeout=7200'"
         cmd: _ledStrip
     button12:
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- zwave
+        # the light for button 12 will be controlled remotely
         # pastel mode
         vars:
             STRIP_DATA: "'ledStripMode=1&timeout=7200'"
@@ -439,6 +445,8 @@ handlers:
         cmd: _ledStrip
     button16:
         # clear led strip
+        # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- garage_light_state
+        # under id 16, the light for this button will be controlled remotely
         cmds: [ _ledStrip, sleep 3, _ledStrip ]
     button17:
         vars: { ACTION: 'on' }
@@ -459,8 +467,10 @@ handlers:
         vars: { ACTION: 'off' }
         cmd: _purpleroom_light
     #button23:
+    # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- node_kitchen_steps
     #    cmd: echo mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl
     #button24:
+    # Ref: mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl -- node_kitchen_steps
     #    cmd: echo mqtt-boxes/apps/mqtt_boxes/src/node_buttonbox2.erl
     button25:
         vars: { ACTION: 'on' }
@@ -555,6 +565,34 @@ handlers:
         cmd: button1_red_green
     button44_long:
         cmds: button42_and_44
+    button45:
+        vars: { ONOFF_PORT: 2, ONOFF_VALUE: up, DEBUG_INFO_PORT: playground1 }
+        cmd: _onoffpins_cmd
+    button46:
+        vars: { ONOFF_PORT: 2, ONOFF_VALUE: down, DEBUG_INFO_PORT: playground1 }
+        cmd: _onoffpins_cmd
+    button45_and_46:
+        vars: { ONOFF_PORT: 2, DEBUG_INFO_PORT: playground1 }
+        cmd: _onoffpins_cmd
+    button47:
+        vars: { ONOFF_PORT: 3, ONOFF_VALUE: up, DEBUG_INFO_PORT: playground2 }
+        cmd: _onoffpins_cmd
+    button48:
+        vars: { ONOFF_PORT: 3, ONOFF_VALUE: down, DEBUG_INFO_PORT: playground2 }
+        cmd: _onoffpins_cmd
+    button47_and_48:
+        vars: { ONOFF_PORT: 3, DEBUG_INFO_PORT: playground2 }
+        cmd: _onoffpins_cmd
+    _onoffpins_cmd:
+        attrs: { in_sequence: false }
+        vars: { ONOFF_PORT: 999, ONOFF_VALUE: flip, DEBUG_INFO_PORT: unknown }
+        cmds:
+            - '%PUB /onoffpins/%ONOFF_PORT -m %ONOFF_VALUE'
+            - echo onoffpins set pin %ONOFF_PORT aka %DEBUG_INFO_PORT to %ONOFF_VALUE
+            # explicitly ping onoffpins to force it to broadcast the operational state of its
+            # pins, which will make buttonbox able to set the on/off buttons 45 to 48
+            - sleep 2
+            - '%PUB /onoffpins/ping -r -n'
     button64:
         cmd: echo 64
     battery:
