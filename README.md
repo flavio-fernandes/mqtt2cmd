@@ -39,11 +39,11 @@ on my [bedclock](http://www.flaviof.com/blog2/post/hacks/bedclock/);
 
 - Clone this repo
 - Make sure to have python3 and python3-pip installed
-- Run script [create-env.sh](https://github.com/flavio-fernandes/mqtt2cmd/blob/master/mqtt2cmd/bin/create-env.sh)
+- Run script [create-env.sh](https://github.com/flavio-fernandes/mqtt2cmd/blob/main/mqtt2cmd/bin/create-env.sh)
 to create an environment with all the
-[dependencies](https://github.com/flavio-fernandes/mqtt2cmd/blob/master/requirements.txt)
+[dependencies](https://github.com/flavio-fernandes/mqtt2cmd/blob/main/requirements.txt)
 - Start environment you just created
-- Create/change a config yaml (see examples [here](https://github.com/flavio-fernandes/mqtt2cmd/tree/master/data)) file to indicate:
+- Create/change a config yaml (see examples [here](https://github.com/flavio-fernandes/mqtt2cmd/tree/main/data)) file to indicate:
     - the MQTT broker to be used
     - topics to be subscribed to
     - handlers to indicate what to do when events on the topics take place
@@ -74,7 +74,7 @@ $ sudo systemctl start mqtt2cmd.service
 #### Installation via Vagrant
 
 In order to easily have a VM running this project, take a
-look at the [Vagrantfile](https://github.com/flavio-fernandes/mqtt2cmd/blob/master/Vagrantfile).
+look at the [Vagrantfile](https://github.com/flavio-fernandes/mqtt2cmd/blob/main/Vagrantfile).
 Once you have [Vagrant](https://www.vagrantup.com/) installed, these steps will get you going:
 
 ```bash
@@ -112,16 +112,16 @@ From another shell session
 
 Try publishing into these topic to see mqtt2cmd in action.
 These topics are used in the config example located in
-[config.yaml.vagrant](https://github.com/flavio-fernandes/mqtt2cmd/tree/master/data/config.yaml.vagrant):
+[config.yaml.vagrant](https://github.com/flavio-fernandes/mqtt2cmd/tree/main/data/config.yaml.vagrant):
 ```bash
 $ mosquitto_pub -h ${MQTT_BROKER} -t /foo/bar -m hello
 $ mosquitto_pub -h ${MQTT_BROKER} -t /foo/foo -n
 ```
 
 By looking at the
-[test script file](https://github.com/flavio-fernandes/mqtt2cmd/blob/master/mqtt2cmd/tests/basic_test.sh.vagrant),
+[test script file](https://github.com/flavio-fernandes/mqtt2cmd/blob/main/mqtt2cmd/tests/basic_test.sh.vagrant),
 together with the
-[config yaml files](https://github.com/flavio-fernandes/mqtt2cmd/tree/master/data)
+[config yaml files](https://github.com/flavio-fernandes/mqtt2cmd/tree/main/data)
 you should be able to get a good idea on how to
 use this project to do whatever you are interested in. Otherwise, please
 [reach out](https://flaviof.com),
