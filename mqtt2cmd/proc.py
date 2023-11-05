@@ -19,8 +19,8 @@ class CommandException(Exception):
 
 class Group:
     """
-        Runs a subprocess in parallel, capturing it's output and providing non-blocking reads
-        (well, at least for the caller they appear non-blocking).
+    Runs a subprocess in parallel, capturing it's output and providing non-blocking reads
+    (well, at least for the caller they appear non-blocking).
     """
 
     def __init__(self):
@@ -33,12 +33,12 @@ class Group:
 
     def run(self, cmd, shell=False):
         """
-            Adds a new process to this object. This process is run and the output collected.
+        Adds a new process to this object. This process is run and the output collected.
 
-            @param cmd: the command to execute. This may be an array as passed to Popen,
-                or a string, which will be parsed by 'shlex.split'
-            @param shell: specifies whether to use the shell as the program to execute.
-            @return: the handle to the process return from Popen
+        @param cmd: the command to execute. This may be an array as passed to Popen,
+            or a string, which will be parsed by 'shlex.split'
+        @param shell: specifies whether to use the shell as the program to execute.
+        @return: the handle to the process return from Popen
         """
         try:
             return self._run_impl(cmd, shell)
@@ -48,16 +48,17 @@ class Group:
     def _run_impl(self, cmd, shell):
         cmd = _expand_cmd(cmd)
 
-        handle = subprocess.Popen(cmd,
-                                  shell=shell,
-                                  # bufsize=1,
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.STDOUT,
-                                  # needed to detach from calling terminal (other wacky things
-                                  # can happen)
-                                  stdin=subprocess.PIPE,
-                                  close_fds=True,
-                                  )
+        handle = subprocess.Popen(
+            cmd,
+            shell=shell,
+            # bufsize=1,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            # needed to detach from calling terminal (other wacky things
+            # can happen)
+            stdin=subprocess.PIPE,
+            close_fds=True,
+        )
         handle.group_output_done = False
         self.handles.append(handle)
 
@@ -66,7 +67,7 @@ class Group:
 
         def block_read():
             try:
-                for line in iter(handle.stdout.readline, b''):
+                for line in iter(handle.stdout.readline, b""):
                     self.output.put((handle, line))
             except Exception:
                 pass
@@ -95,19 +96,19 @@ class Group:
 
     def readlines(self, max_lines=1000, timeout=2.0):
         """
-            Reads available lines from any of the running processes. If no lines are available now
-            it will wait until 'timeout' to read a line. If nothing is running the timeout is not
-            waited and the function simply returns.
+        Reads available lines from any of the running processes. If no lines are available now
+        it will wait until 'timeout' to read a line. If nothing is running the timeout is not
+        waited and the function simply returns.
 
-            When a process has been completed and all output has been read from it, a
-            variable 'group_ouput_done' will be set to True on the process handle.
+        When a process has been completed and all output has been read from it, a
+        variable 'group_ouput_done' will be set to True on the process handle.
 
-            @param timeout: how long to wait if there is nothing available now
-            @param max_lines: maximum number of lines to get at once
-            @return: An array of tuples of the form:
-                ( handle, line )
-                There 'handle' was returned by 'run' and 'line' is the line which is read.
-                If no line is available an empty list is returned.
+        @param timeout: how long to wait if there is nothing available now
+        @param max_lines: maximum number of lines to get at once
+        @return: An array of tuples of the form:
+            ( handle, line )
+            There 'handle' was returned by 'run' and 'line' is the line which is read.
+            If no line is available an empty list is returned.
         """
         lines = []
         try:
@@ -134,13 +135,13 @@ class Group:
 
     def readline(self, timeout=2.0):
         """
-            Read a single line from any running process.
+        Read a single line from any running process.
 
-            Note that this will end up blocking for timeout once all processes have completed.
-            'readlines' however can properly handle that situation and stop reading once
-            everything is complete.
+        Note that this will end up blocking for timeout once all processes have completed.
+        'readlines' however can properly handle that situation and stop reading once
+        everything is complete.
 
-            @return: Tuple of ( handle, line ) or None if no output generated.
+        @return: Tuple of ( handle, line ) or None if no output generated.
         """
         try:
             handle, line = self.output.get(timeout=timeout)
@@ -153,8 +154,8 @@ class Group:
 
     def is_pending(self):
         """
-            Determine if calling readlines would actually yield any output. This returns true
-            if there is a process running or there is data in the queue.
+        Determine if calling readlines would actually yield any output. This returns true
+        if there is a process running or there is data in the queue.
         """
         if self.waiting > 0:
             return True
@@ -162,9 +163,9 @@ class Group:
 
     def count_running(self):
         """
-            Return the number of processes still running. Note that although a process may
-            be finished there could still be output from it in the queue. You should use
-            'is_pending' to determine if you should still be reading.
+        Return the number of processes still running. Note that although a process may
+        be finished there could still be output from it in the queue. You should use
+        'is_pending' to determine if you should still be reading.
         """
         count = 0
         for handle in self.handles:
@@ -174,12 +175,12 @@ class Group:
 
     def get_exit_codes(self):
         """
-            Return a list of all processes and their exit code.
+        Return a list of all processes and their exit code.
 
-            @return: A list of tuples:
-                ( handle, exit_code )
-                'handle' as returned from 'run'
-                'exit_code' of the process or None if it has not yet finished
+        @return: A list of tuples:
+            ( handle, exit_code )
+            'handle' as returned from 'run'
+            'exit_code' of the process or None if it has not yet finished
         """
         codes = []
         for handle in self.handles:
@@ -188,7 +189,7 @@ class Group:
 
     def clear_finished(self):
         """
-            Remove all finished processes from the managed list.
+        Remove all finished processes from the managed list.
         """
         nhandles = []
         for handle in self.handles:
@@ -198,8 +199,8 @@ class Group:
 
     def close(self):
         """
-            Experimental closing of all handles, even if they haven't finished. This likely doesn't
-            work on all platforms
+        Experimental closing of all handles, even if they haven't finished. This likely doesn't
+        work on all platforms
         """
         for handle in self.handles:
             try:
@@ -213,37 +214,47 @@ class Group:
 
 class BadExitCode(Exception):
     def __init__(self, exit_code, output):
-        Exception.__init__(self,
-                           'subprocess-bad-exit-code: {}: {}'.format(exit_code, output[:1024]))
+        Exception.__init__(
+            self, "subprocess-bad-exit-code: {}: {}".format(exit_code, output[:1024])
+        )
         self.exit_code = exit_code
         self.output = output
 
 
 class Timeout(Exception):
     def __init__(self, output):
-        Exception.__init__(self, 'subprocess-timeout')
+        Exception.__init__(self, "subprocess-timeout")
         self.output = output
 
 
-def call(cmd, encoding='utf-8', shell=False, check_exit_code=True, timeout=None, cwd=None):
+def call(
+    cmd, encoding="utf-8", shell=False, check_exit_code=True, timeout=None, cwd=None
+):
     """
-        Calls a subprocess and returns the output and optionally exit code.
+    Calls a subprocess and returns the output and optionally exit code.
 
-        @param cmd: the command to execute. This may be an array as passed to Popen,
-            or a string, which will be parsed by 'shlex.split'
-        @param encoding: convert output to unicode objects with this encoding, set to None to
-            get the raw output
-        @param shell: specifies whether to use the shell as the program to execute.
-        @param check_exit_code: set to False to ignore the exit code, otherwise any non-zero
-            result will throw BadExitCode.
-        @param timeout: If specified only this amount of time (seconds) will be waited for
-            the subprocess to return
-        @param cwd: x
-        @return: If check_exit_code is False: list( output, exit_code ), else just the output
+    @param cmd: the command to execute. This may be an array as passed to Popen,
+        or a string, which will be parsed by 'shlex.split'
+    @param encoding: convert output to unicode objects with this encoding, set to None to
+        get the raw output
+    @param shell: specifies whether to use the shell as the program to execute.
+    @param check_exit_code: set to False to ignore the exit code, otherwise any non-zero
+        result will throw BadExitCode.
+    @param timeout: If specified only this amount of time (seconds) will be waited for
+        the subprocess to return
+    @param cwd: x
+    @return: If check_exit_code is False: list( output, exit_code ), else just the output
     """
     cmd = _expand_cmd(cmd)
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            stdin=subprocess.DEVNULL, shell=shell, cwd=cwd, close_fds=True)
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+        shell=shell,
+        cwd=cwd,
+        close_fds=True,
+    )
 
     def decode(param_out):
         if encoding is not None:

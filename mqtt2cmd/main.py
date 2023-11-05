@@ -22,8 +22,11 @@ class ProcessBase(multiprocessing.Process):
         try:
             self.eventq.put(event, False)
         except queue.Full:
-            logger.error("Exiting: Queue is stuck, cannot add event: %s %s",
-                         event.name, event.description)
+            logger.error(
+                "Exiting: Queue is stuck, cannot add event: %s %s",
+                event.name,
+                event.description,
+            )
             raise RuntimeError("Main process has a full event queue")
 
 
@@ -43,10 +46,14 @@ def processMqttMsgEvent(topic, payload):
 
 
 def processEventMqttClient(event):
-    syncFunHandlers = {"MqttMsgEvent": processMqttMsgEvent, }
+    syncFunHandlers = {
+        "MqttMsgEvent": processMqttMsgEvent,
+    }
     cmdFun = syncFunHandlers.get(event.name)
     if not cmdFun:
-        logger.warning("Don't know how to process event %s: %s", event.name, event.description)
+        logger.warning(
+            "Don't know how to process event %s: %s", event.name, event.description
+        )
         return
     if event.params:
         cmdFun(*event.params)
@@ -70,10 +77,14 @@ def processHandlerDoneEvent(msg):
 
 
 def processEventDispatcher(event):
-    syncFunHandlers = {"DispatcherHandlerDoneEvent": processHandlerDoneEvent, }
+    syncFunHandlers = {
+        "DispatcherHandlerDoneEvent": processHandlerDoneEvent,
+    }
     cmdFun = syncFunHandlers.get(event.name)
     if not cmdFun:
-        logger.warning("Don't know how to process event %s: %s", event.name, event.description)
+        logger.warning(
+            "Don't know how to process event %s: %s", event.name, event.description
+        )
         return
     if event.params:
         cmdFun(*event.params)
@@ -83,11 +94,15 @@ def processEventDispatcher(event):
 
 def processEvent(event):
     # Based on the event, call a lambda to make mqtt and smartswitch in sync
-    syncFunHandlers = {"mqtt": processEventMqttClient,
-                       "dispatcher": processEventDispatcher, }
+    syncFunHandlers = {
+        "mqtt": processEventMqttClient,
+        "dispatcher": processEventDispatcher,
+    }
     cmdFun = syncFunHandlers.get(event.group)
     if not cmdFun:
-        logger.warning("Don't know how to process event %s: %s", event.name, event.description)
+        logger.warning(
+            "Don't know how to process event %s: %s", event.name, event.description
+        )
         return
     cmdFun(event)
 
@@ -141,9 +156,9 @@ if __name__ == "__main__":
 
     knobs = Cfg().knobs
     if isinstance(knobs, collections.abc.Mapping):
-        if knobs.get('log_to_console'):
+        if knobs.get("log_to_console"):
             log.log_to_console()
-        if knobs.get('log_level_debug'):
+        if knobs.get("log_level_debug"):
             log.set_log_level_debug()
 
     logger.debug("mqtt2cmd process started")

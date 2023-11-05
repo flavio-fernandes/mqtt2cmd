@@ -22,8 +22,15 @@ _state = None
 
 
 class State(object):
-    def __init__(self, queueEventFun, mqtt_broker_ip, mqtt_client_id, mqtt_status_topic,
-                 mqtt_ping_topic, topics):
+    def __init__(
+        self,
+        queueEventFun,
+        mqtt_broker_ip,
+        mqtt_client_id,
+        mqtt_status_topic,
+        mqtt_ping_topic,
+        topics,
+    ):
         self.queueEventFun = queueEventFun  # queue for output events
         self.cmdq = multiprocessing.Queue(CMDQ_SIZE)  # queue for input commands
         self.mqtt_broker_ip = mqtt_broker_ip
@@ -50,12 +57,19 @@ def do_init(queueEventFun=None):
     topics = cfg.topics
     assert isinstance(topics, dict)
 
-    _state = State(queueEventFun, mqtt_broker_ip, mqtt_client_id, mqtt_status_topic,
-                   mqtt_ping_topic, list(topics.keys()))
+    _state = State(
+        queueEventFun,
+        mqtt_broker_ip,
+        mqtt_client_id,
+        mqtt_status_topic,
+        mqtt_ping_topic,
+        list(topics.keys()),
+    )
     # logger.debug("mqttclient init called")
 
 
 # =============================================================================
+
 
 def _notifyMqttMsgEvent(topic, payload):
     global _state
@@ -81,28 +95,41 @@ def _notifyEvent(event):
 def client_connect_callback(client, userdata, flags_dict, rc):
     global _state
     if rc != mqtt.MQTT_ERR_SUCCESS:
-        logger.warning("client %s connect failed with flags %s rc %s %s",
-                       _state.mqtt_client_id, flags_dict, rc, mqtt.error_string(rc))
+        logger.warning(
+            "client %s connect failed with flags %s rc %s %s",
+            _state.mqtt_client_id,
+            flags_dict,
+            rc,
+            mqtt.error_string(rc),
+        )
         return
-    logger.info("client %s connected with flags %s rc %s", _state.mqtt_client_id, flags_dict, rc)
+    logger.info(
+        "client %s connected with flags %s rc %s", _state.mqtt_client_id, flags_dict, rc
+    )
     # userdata is list of topics we care about
-    assert isinstance(userdata, list), "Unexpected userdata from callback: {}".format(userdata)
-    assert userdata[0] == 'topics', "Unexpected userdata from callback: {}".format(userdata)
+    assert isinstance(userdata, list), "Unexpected userdata from callback: {}".format(
+        userdata
+    )
+    assert userdata[0] == "topics", "Unexpected userdata from callback: {}".format(
+        userdata
+    )
     mqtt2cmd_topics = [(t, TOPIC_QOS) for t in userdata[1:]]
     client.subscribe(mqtt2cmd_topics)
 
 
 def client_message_callback(_client, _userdata, msg):
     logger.debug("callback for mqtt message %s %s", msg.topic, msg.payload)
-    topic = msg.topic.decode('utf-8') if isinstance(msg.topic, bytes) else msg.topic
-    payload = msg.payload.decode('utf-8') if isinstance(msg.payload, bytes) else msg.payload
+    topic = msg.topic.decode("utf-8") if isinstance(msg.topic, bytes) else msg.topic
+    payload = (
+        msg.payload.decode("utf-8") if isinstance(msg.payload, bytes) else msg.payload
+    )
     params = [topic, payload]
     _enqueue_cmd((_notifyMqttMsgEvent, params))
 
 
 def _setup_mqtt_client(broker_ip, client_id, topics):
     try:
-        userdata = ['topics'] + topics
+        userdata = ["topics"] + topics
         client = mqtt.Client(client_id=client_id, userdata=userdata)
         client.on_connect = client_connect_callback
         client.on_message = client_message_callback
@@ -122,8 +149,9 @@ def do_iterate():
     global _state
 
     if not _state.mqtt_client:
-        _state.mqtt_client = _setup_mqtt_client(_state.mqtt_broker_ip, _state.mqtt_client_id,
-                                                _state.topics)
+        _state.mqtt_client = _setup_mqtt_client(
+            _state.mqtt_broker_ip, _state.mqtt_client_id, _state.topics
+        )
         if not _state.mqtt_client:
             logger.warning("got no mqttt client")
             time.sleep(30)
@@ -136,7 +164,8 @@ def do_iterate():
         ts = now.strftime("%I:%M:%S%p on %B %d, %Y")
         _do_handle_mqtt_ping(ts)
         _state.next_ping_ts = now + datetime.timedelta(
-            seconds=const.MQTT_CLIENT_PING_INTERVAL_SECS)
+            seconds=const.MQTT_CLIENT_PING_INTERVAL_SECS
+        )
 
     try:
         cmdDill = _state.cmdq.get(True, CMDQ_GET_TIMEOUT)
@@ -175,8 +204,13 @@ def _mqtt_publish(topic, value=None, qos=0):
             info = _state.mqtt_client.publish(topic, value, qos)
             info.wait_for_publish()
     except Exception as e:
-        logger.error("client failed publish mqtt topic %s %s timeout_ctx %s %s", topic, value,
-                     timeout_ctx, e)
+        logger.error(
+            "client failed publish mqtt topic %s %s timeout_ctx %s %s",
+            topic,
+            value,
+            timeout_ctx,
+            e,
+        )
         return
     logger.debug("published mqtt topic %s %s", topic, value)
 

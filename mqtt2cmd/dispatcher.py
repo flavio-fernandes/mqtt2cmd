@@ -56,12 +56,15 @@ def do_init(queueEventFun=None):
 
 # =============================================================================
 
-ShellJobInfo = namedtuple('ShellJobInfo',
-                          'grp timeout stop_on_failure in_sequence log_output shell')
+ShellJobInfo = namedtuple(
+    "ShellJobInfo", "grp timeout stop_on_failure in_sequence log_output shell"
+)
 
 
 class Job(dict):
-    def __init__(self, job_id, topic, payload, handler, attrs, vars, cfg_globals, commands):
+    def __init__(
+        self, job_id, topic, payload, handler, attrs, vars, cfg_globals, commands
+    ):
         self.job_id = job_id
         self.create_ts = datetime.datetime.now().strftime("%I:%M:%S%p on %B %d, %Y")
         self.topic = topic
@@ -78,14 +81,19 @@ class Job(dict):
 
         # ref: https://flashtext.readthedocs.io/en/latest/#
         keyword_processor = KeywordProcessor(case_sensitive=True)
-        keyword_processor.set_non_word_boundaries(set(['~']))
+        keyword_processor.set_non_word_boundaries(set(["~"]))
         for k, v in self.__dict__.items():
             keyword_processor.add_keyword(
-                "{}{}{}".format(const.CONFIG_VARIABLE_PREFIX, k, const.CONFIG_VARIABLE_SUFFIX),
-                str(v))
+                "{}{}{}".format(
+                    const.CONFIG_VARIABLE_PREFIX, k, const.CONFIG_VARIABLE_SUFFIX
+                ),
+                str(v),
+            )
 
         try:
-            self.commands = [self._replace_keywords(keyword_processor, c, 0) for c in commands]
+            self.commands = [
+                self._replace_keywords(keyword_processor, c, 0) for c in commands
+            ]
         except ValueError as e:
             logger.error(e)
             self.commands = []
@@ -122,8 +130,10 @@ class Job(dict):
             # Likely a circular dependency issue?!?
             logger.error(
                 "payload {} msg {} too many recursions to extract value for {}".format(
-                    self.payload, self.handler, cmd))
-            raise ValueError('failed nested lookup variables for job', self)
+                    self.payload, self.handler, cmd
+                )
+            )
+            raise ValueError("failed nested lookup variables for job", self)
         return cmd
 
 
@@ -132,17 +142,27 @@ def _do_handle_dispatch(topic, payload):
 
     # find msg for topic and payload tuple
     topicPayloads = _state.topics.get(topic, {})
-    handler = topicPayloads.get(payload) or topicPayloads.get(const.CONFIG_DEFAULT_PAYLOAD)
+    handler = topicPayloads.get(payload) or topicPayloads.get(
+        const.CONFIG_DEFAULT_PAYLOAD
+    )
     handler_job = _state.handlers.get(handler, {})
     attrs = handler_job.get(const.CONFIG_ATTRS, {})
     vars = handler_job.get(const.CONFIG_VARS, {})
     commands = handler_job.get(const.CONFIG_CMDS, [])
 
-    job = Job(_state.next_job_id, topic, payload, handler, attrs, vars, _state.cfg_globals,
-              commands)
+    job = Job(
+        _state.next_job_id,
+        topic,
+        payload,
+        handler,
+        attrs,
+        vars,
+        _state.cfg_globals,
+        commands,
+    )
 
     _state.next_job_id += 1
-    if _state.next_job_id > 0xffff:
+    if _state.next_job_id > 0xFFFF:
         logger.info("wrapping next_job_id from {} to 1".format(_state.next_job_id))
         _state.next_job_id = 1
 
@@ -152,12 +172,17 @@ def _do_handle_dispatch(topic, payload):
 
     jobs_count = len(_state.curr_jobs)
     if jobs_count >= MAX_CONCURRENT_JOBS:
-        logger.error("too many jobs: {}. dispatcher unable to start job {})".format(
-            jobs_count, job))
+        logger.error(
+            "too many jobs: {}. dispatcher unable to start job {})".format(
+                jobs_count, job
+            )
+        )
         return
 
     now = datetime.datetime.now()
-    timeout_param = int(job.get(const.CONFIG_TIMEOUT, const.CONFIG_TIMEOUT_DEFAULT_SECS))
+    timeout_param = int(
+        job.get(const.CONFIG_TIMEOUT, const.CONFIG_TIMEOUT_DEFAULT_SECS)
+    )
     if timeout_param:
         timeout = now + datetime.timedelta(seconds=timeout_param)
     else:
@@ -165,25 +190,30 @@ def _do_handle_dispatch(topic, payload):
 
     stop_on_failure = job.get(const.CONFIG_STOP, const.CONFIG_STOP_DEFAULT)
     in_sequence = job.get(const.CONFIG_IN_SEQ, const.CONFIG_IN_SEQ_DEFAULT)
-    log_output = job.get(const.CONFIG_LOG_CMD_OUTPUT, const.CONFIG_LOG_CMD_OUTPUT_DEFAULT)
+    log_output = job.get(
+        const.CONFIG_LOG_CMD_OUTPUT, const.CONFIG_LOG_CMD_OUTPUT_DEFAULT
+    )
     shell = job.get(const.CONFIG_SHELL, const.CONFIG_SHELL_DEFAULT)
 
     logger.debug("starting job {})".format(job))
 
-    job_params_info = ''
+    job_params_info = ""
     if stop_on_failure != const.CONFIG_STOP_DEFAULT:
-        job_params_info += ' stop_on_failure: {}'.format(stop_on_failure)
+        job_params_info += " stop_on_failure: {}".format(stop_on_failure)
     if in_sequence != const.CONFIG_IN_SEQ_DEFAULT:
-        job_params_info += ' in_sequence: {}'.format(in_sequence)
+        job_params_info += " in_sequence: {}".format(in_sequence)
     if timeout_param != const.CONFIG_TIMEOUT_DEFAULT_SECS:
-        job_params_info += ' timeout: {}'.format(timeout)
+        job_params_info += " timeout: {}".format(timeout)
     if log_output != const.CONFIG_LOG_CMD_OUTPUT_DEFAULT:
-        job_params_info += ' log_output: {}'.format(log_output)
+        job_params_info += " log_output: {}".format(log_output)
     if shell != const.CONFIG_SHELL_DEFAULT:
-        job_params_info += ' shell: {}'.format(shell)
+        job_params_info += " shell: {}".format(shell)
 
-    logger.info("starting job: {} handler: {} cmds: {}{} (curr total jobs: {})".format(
-        job.job_id, job.handler, job.commands, job_params_info, jobs_count + 1))
+    logger.info(
+        "starting job: {} handler: {} cmds: {}{} (curr total jobs: {})".format(
+            job.job_id, job.handler, job.commands, job_params_info, jobs_count + 1
+        )
+    )
 
     grp = proc.Group()
     job.shell_job_info_cmds = [c for c in job.commands]
@@ -193,7 +223,9 @@ def _do_handle_dispatch(topic, payload):
             p = grp.run(c, shell=shell)
             job.shell_job_info_proc_handles.append(p)
         except proc.CommandException as e:
-            logger.error("job %s handle %s failed command %s: %s", job.job_id, job.handler, c, e)
+            logger.error(
+                "job %s handle %s failed command %s: %s", job.job_id, job.handler, c, e
+            )
             logger.error("job %s %s", job.job_id, e)
             kill_job_procs(job)
             job.shell_job_info_cmds.clear()
@@ -202,8 +234,9 @@ def _do_handle_dispatch(topic, payload):
         if in_sequence:
             break
 
-    job.shell_job_info = ShellJobInfo(grp, timeout, stop_on_failure, in_sequence, log_output,
-                                      shell)
+    job.shell_job_info = ShellJobInfo(
+        grp, timeout, stop_on_failure, in_sequence, log_output, shell
+    )
     _state.curr_jobs[job.job_id] = job
     _enqueue_cmd((_noop, []))
 
@@ -226,6 +259,7 @@ def _notifyEvent(event):
 
 # =============================================================================
 
+
 def _check_curr_jobs():
     global _state
 
@@ -233,8 +267,11 @@ def _check_curr_jobs():
     if jobs_finished:
         for job_id in jobs_finished:
             del _state.curr_jobs[job_id]
-        logger.debug("finished with jobs {} (curr total jobs: {})".format(
-            jobs_finished, len(_state.curr_jobs)))
+        logger.debug(
+            "finished with jobs {} (curr total jobs: {})".format(
+                jobs_finished, len(_state.curr_jobs)
+            )
+        )
 
 
 def _log_shell_job_output(job):
@@ -260,8 +297,10 @@ def _check_job(job_id):
 
         if not job.shell_job_info_cmds:
             _notifyDispatcherHandlerDoneEvent(
-                "job {} handle {} finished with rc {}".format(job.job_id, job.handler,
-                                                              job.shell_job_info_rc))
+                "job {} handle {} finished with rc {}".format(
+                    job.job_id, job.handler, job.shell_job_info_rc
+                )
+            )
             return True
 
         cmd = job.shell_job_info_cmds.pop(0)
@@ -276,8 +315,13 @@ def _check_job(job_id):
                 if rc != 0:
                     job.shell_job_info_rc = rc
                     break
-        logger.debug("job %s handle %s finished cmd %s exit code %s", job.job_id, job.handler, cmd,
-                     rc)
+        logger.debug(
+            "job %s handle %s finished cmd %s exit code %s",
+            job.job_id,
+            job.handler,
+            cmd,
+            rc,
+        )
         shi.grp.clear_finished()
 
         if job.shell_job_info_rc and shi.stop_on_failure:
@@ -285,16 +329,23 @@ def _check_job(job_id):
 
         if shi.in_sequence and job.shell_job_info_cmds:
             cmd = job.shell_job_info_cmds[0]
-            logger.debug("job %s handle %s starting command cmd %s", job.job_id, job.handler, cmd)
+            logger.debug(
+                "job %s handle %s starting command cmd %s", job.job_id, job.handler, cmd
+            )
             try:
                 p = shi.grp.run(cmd, shi.shell)
                 # start new proc handles
                 job.shell_job_info_proc_handles = [p]
             except proc.CommandException as e:
-                logger.error("job %s handle %s failed command %s: %s", job.job_id, job.handler,
-                             cmd, e)
+                logger.error(
+                    "job %s handle %s failed command %s: %s",
+                    job.job_id,
+                    job.handler,
+                    cmd,
+                    e,
+                )
                 job.shell_job_info_rc = -2
-                #job.shell_job_info_cmds.pop(0)  NOTE: pop(0) happens on next iteration
+                # job.shell_job_info_cmds.pop(0)  NOTE: pop(0) happens on next iteration
                 job.shell_job_info_proc_handles = []
 
     now = datetime.datetime.now()
@@ -318,6 +369,7 @@ def kill_job_procs(job):
 
 
 # =============================================================================
+
 
 # external to this module
 def do_iterate():
