@@ -5,30 +5,44 @@ from os import path
 
 
 def getLogger():
-    return logging.getLogger('mqtt2cmd')
+    return logging.getLogger("mqtt2cmd")
 
 
 def _log_handler_address(files=tuple()):
     try:
         return next(f for f in files if path.exists(f))
     except StopIteration:
-        pass
-    raise Exception("Invalid files: %s" % ", ".join(files))
+        logging.warning(
+            "Invalid files: %s. Using stdout as fallback." % ", ".join(files)
+        )
+        return None
 
 
 def initLogger(testing=False):
     logger = getLogger()
     logger.setLevel(logging.INFO)
-    format = '%(asctime)s [mqtt2cmd] %(module)12s:%(lineno)-d %(levelname)-8s %(message)s'
+
+    format = (
+        "%(asctime)s [mqtt2cmd] %(module)12s:%(lineno)-d %(levelname)-8s %(message)s"
+    )
     formatter = logging.Formatter(format)
 
     # Logs are normally configured here: /etc/rsyslog.d/*
     logHandlerAddress = _log_handler_address(
-        ["/run/systemd/journal/syslog", "/var/run/syslog", "/dev/log"])
-    syslog = SysLogHandler(address=logHandlerAddress,
-                           facility=SysLogHandler.LOG_DAEMON)
-    syslog.setFormatter(formatter)
-    logger.addHandler(syslog)
+        ["/run/systemd/journal/syslog", "/var/run/syslog", "/device/log"]
+    )
+
+    if logHandlerAddress:
+        syslog = SysLogHandler(
+            address=logHandlerAddress, facility=SysLogHandler.LOG_DAEMON
+        )
+        syslog.setFormatter(formatter)
+        logger.addHandler(syslog)
+    else:
+        stdout_handler = logging.StreamHandler()
+        stdout_handler.setFormatter(formatter)
+        logger.addHandler(stdout_handler)
+
     if testing:
         log_to_console()
         set_log_level_debug()
@@ -36,7 +50,7 @@ def initLogger(testing=False):
 
 def log_to_console():
     consoleHandler = logging.StreamHandler()
-    format = '%(asctime)s %(module)12s:%(lineno)-d %(levelname)-8s %(message)s'
+    format = "%(asctime)s %(module)12s:%(lineno)-d %(levelname)-8s %(message)s"
     formatter = logging.Formatter(format)
     consoleHandler.setFormatter(formatter)
     getLogger().addHandler(consoleHandler)
