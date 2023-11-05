@@ -9,7 +9,6 @@ TOP_DIR="${PROG_DIR%/*}"
 
 pushd ${TOP_DIR}
 if [ ! -e ./env ]; then
-    #virtualenv --system-site-packages env
     python3 -m venv --copies env
 fi
 source ./env/bin/activate

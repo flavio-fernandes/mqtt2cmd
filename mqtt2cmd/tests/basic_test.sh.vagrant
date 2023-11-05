@@ -88,7 +88,7 @@ mosquitto_pub -h ${MQTT_BROKER} -t /buttonbox/buttons -m test_stop_on_failure
 get_log_lines 5
 grep --quiet -E 'output .+testing checkpoint1' ${TMP_OUTPUT} || { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
 grep --quiet -E 'output .+testing checkpoint2' ${TMP_OUTPUT} && { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
-grep --quiet -E 'cannot access /321boom123/boom/boom/boom' ${TMP_OUTPUT} || \
+grep --quiet -E 'cannot access.+/321boom123/boom/boom/boom' ${TMP_OUTPUT} || \
   { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
 grep --quiet -E 'finished with rc 0' ${TMP_OUTPUT} && { echo "FAILED in $0 line ${LINENO}" >&2; exit ${LINENO}; }
 
