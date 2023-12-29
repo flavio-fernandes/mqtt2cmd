@@ -13,6 +13,8 @@ knobs:
     log_level_debug: false
 mqtt:
     host: 192.168.123.123
+    # username: <mqtt username>
+    # password: <mqtt password>
 topics:
     /buttonbox/battery:
         '{"volts":"3.75"}': battery_ok

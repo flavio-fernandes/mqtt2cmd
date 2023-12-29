@@ -36,6 +36,20 @@ class Cfg(object):
         return const.MQTT_CLIENT_ID_DEFAULT
 
     @property
+    def mqtt_username(self):
+        attr = self._get_info().mqtt
+        if isinstance(attr, collections.abc.Mapping):
+            return attr.get("username", None)
+        return None
+
+    @property
+    def mqtt_password(self):
+        attr = self._get_info().mqtt
+        if isinstance(attr, collections.abc.Mapping):
+            return attr.get("password", None)
+        return None
+
+    @property
     def mqtt_status_topic(self):
         attr = self._get_info().mqtt
         if isinstance(attr, collections.abc.Mapping):

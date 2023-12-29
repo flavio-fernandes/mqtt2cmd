@@ -27,6 +27,8 @@ class State(object):
         queueEventFun,
         mqtt_broker_ip,
         mqtt_client_id,
+        mqtt_username,
+        mqtt_password,
         mqtt_status_topic,
         mqtt_ping_topic,
         topics,
@@ -35,6 +37,8 @@ class State(object):
         self.cmdq = multiprocessing.Queue(CMDQ_SIZE)  # queue for input commands
         self.mqtt_broker_ip = mqtt_broker_ip
         self.mqtt_client_id = mqtt_client_id
+        self.mqtt_username = mqtt_username
+        self.mqtt_password = mqtt_password
         self.mqtt_status_topic = mqtt_status_topic
         self.mqtt_ping_topic = mqtt_ping_topic
         self.topics = topics
@@ -52,6 +56,8 @@ def do_init(queueEventFun=None):
     cfg = Cfg()
     mqtt_broker_ip = cfg.mqtt_host or const.MQTT_DEFAULT_BROKER_IP
     mqtt_client_id = cfg.mqtt_client_id or const.MQTT_CLIENT_ID_DEFAULT
+    mqtt_username = cfg.mqtt_username
+    mqtt_password = cfg.mqtt_password
     mqtt_status_topic = cfg.mqtt_status_topic or const.MQTT_CLIENT_DEFAULT_TOPIC_STATUS
     mqtt_ping_topic = cfg.mqtt_ping_topic or const.MQTT_CLIENT_DEFAULT_TOPIC_PING
     topics = cfg.topics
@@ -61,6 +67,8 @@ def do_init(queueEventFun=None):
         queueEventFun,
         mqtt_broker_ip,
         mqtt_client_id,
+        mqtt_username,
+        mqtt_password,
         mqtt_status_topic,
         mqtt_ping_topic,
         list(topics.keys()),
@@ -127,10 +135,12 @@ def client_message_callback(_client, _userdata, msg):
     _enqueue_cmd((_notifyMqttMsgEvent, params))
 
 
-def _setup_mqtt_client(broker_ip, client_id, topics):
+def _setup_mqtt_client(broker_ip, client_id, mqtt_username, mqtt_password, topics):
     try:
         userdata = ["topics"] + topics
         client = mqtt.Client(client_id=client_id, userdata=userdata)
+        if mqtt_username:
+            client.username_pw_set(mqtt_username, mqtt_password)
         client.on_connect = client_connect_callback
         client.on_message = client_message_callback
 
@@ -150,7 +160,11 @@ def do_iterate():
 
     if not _state.mqtt_client:
         _state.mqtt_client = _setup_mqtt_client(
-            _state.mqtt_broker_ip, _state.mqtt_client_id, _state.topics
+            _state.mqtt_broker_ip,
+            _state.mqtt_client_id,
+            _state.mqtt_username,
+            _state.mqtt_password,
+            _state.topics,
         )
         if not _state.mqtt_client:
             logger.warning("got no mqttt client")
