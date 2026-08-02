@@ -85,11 +85,11 @@ $ sudo journalctl \
 ```
 
 The journal-based command works on current Debian and Raspberry Pi OS releases
-that do not create `/var/log/syslog` by default. Set `LINES` to change the
-initial number of records displayed, for example:
+that do not create `/var/log/syslog` by default. Set `MQTT2CMD_LOG_LINES` to
+change the initial number of records displayed, for example:
 
 ```bash
-$ LINES=250 ./mqtt2cmd/bin/tail_log.sh
+$ MQTT2CMD_LOG_LINES=250 ./mqtt2cmd/bin/tail_log.sh
 ```
 
 #### Installation via Vagrant
