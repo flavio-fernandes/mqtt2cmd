@@ -1,6 +1,5 @@
 dill
 flashtext
-paho-mqtt
+paho-mqtt>=1.6
 pyyaml>=3.11
 six
-stopit
