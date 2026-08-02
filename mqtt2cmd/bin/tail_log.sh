@@ -5,11 +5,11 @@ set -o nounset
 set -o pipefail
 
 UNIT="${MQTT2CMD_SYSTEMD_UNIT:-mqtt2cmd.service}"
-LINES="${LINES:-100}"
+LOG_LINES="${MQTT2CMD_LOG_LINES:-100}"
 
 exec sudo journalctl \
     --unit="${UNIT}" \
-    --lines="${LINES}" \
+    --lines="${LOG_LINES}" \
     --follow \
     --output=short-iso \
     "$@"
