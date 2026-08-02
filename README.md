@@ -38,7 +38,7 @@ on my [bedclock](http://www.flaviof.com/blog2/post/hacks/bedclock/);
 #### Manually
 
 - Clone this repo
-- Make sure to have python3 and python3-pip installed
+- Make sure to have python3 and python3-venv installed
 - Run script [create-env.sh](https://github.com/flavio-fernandes/mqtt2cmd/blob/main/mqtt2cmd/bin/create-env.sh)
 to create an environment with all the
 [dependencies](https://github.com/flavio-fernandes/mqtt2cmd/blob/main/requirements.txt)
@@ -71,6 +71,27 @@ $ sudo systemctl enable mqtt2cmd.service
 $ sudo systemctl start mqtt2cmd.service
 ```
 
+Follow the service logs through the systemd journal:
+
+```bash
+$ ./mqtt2cmd/bin/tail_log.sh
+
+$ # Equivalent command:
+$ sudo journalctl \
+    --unit=mqtt2cmd.service \
+    --lines=100 \
+    --follow \
+    --output=short-iso
+```
+
+The journal-based command works on current Debian and Raspberry Pi OS releases
+that do not create `/var/log/syslog` by default. Set `MQTT2CMD_LOG_LINES` to
+change the initial number of records displayed, for example:
+
+```bash
+$ MQTT2CMD_LOG_LINES=250 ./mqtt2cmd/bin/tail_log.sh
+```
+
 #### Installation via Vagrant
 
 In order to easily have a VM running this project, take a
@@ -81,13 +102,10 @@ Once you have [Vagrant](https://www.vagrantup.com/) installed, these steps will 
 git clone https://github.com/flavio-fernandes/mqtt2cmd.git && \
 cd mqtt2cmd && vagrant up && vagrant ssh
 
-# To see what is mqtt2cmd is up to:
+# To see what mqtt2cmd is up to:
 sudo systemctl status mqtt2cmd
 sudo systemctl cat mqtt2cmd
-/home/vagrant/tail_log.sh
-
-# On systems like RPI, you can also:
-sudo tail -F /var/log/syslog | grep mqtt2cmd
+~/tail_log.sh
 ```
 
 ## Usage

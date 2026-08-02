@@ -8,7 +8,6 @@ import time
 import dill
 import paho.mqtt.client as mqtt
 from six.moves import queue
-import stopit
 
 from mqtt2cmd import const
 from mqtt2cmd import events
@@ -18,6 +17,7 @@ from mqtt2cmd.config import Cfg
 CMDQ_SIZE = 100
 CMDQ_GET_TIMEOUT = 66  # seconds. May affect ping publishing
 TOPIC_QOS = 1
+MQTT_PUBLISH_TIMEOUT_SECS = 9.90
 _state = None
 
 
@@ -213,16 +213,19 @@ def _mqtt_publish(topic, value=None, qos=0):
         logger.warning("no client to publish mqtt topic %s %s", topic, value)
         return
     try:
-        with stopit.ThreadingTimeout(9.90, swallow_exc=False) as timeout_ctx:
-            # logger.debug("publishing mqtt topic %s %s", topic, newState)
-            info = _state.mqtt_client.publish(topic, value, qos)
-            info.wait_for_publish()
+        info = _state.mqtt_client.publish(topic, value, qos)
+        info.wait_for_publish(timeout=MQTT_PUBLISH_TIMEOUT_SECS)
+        if not info.is_published():
+            raise TimeoutError(
+                "MQTT publish timed out after {:.2f} seconds".format(
+                    MQTT_PUBLISH_TIMEOUT_SECS
+                )
+            )
     except Exception as e:
         logger.error(
-            "client failed publish mqtt topic %s %s timeout_ctx %s %s",
+            "client failed publish mqtt topic %s %s: %s",
             topic,
             value,
-            timeout_ctx,
             e,
         )
         return
