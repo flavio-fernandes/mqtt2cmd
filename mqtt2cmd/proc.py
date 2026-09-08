@@ -62,6 +62,16 @@ class Group:
         handle.group_output_done = False
         self.handles.append(handle)
 
+        # kill child when parent dies
+        def premature_exit():
+            try:
+                handle.terminate()
+            except Exception:
+                # who cares why, we're exiting anyway (most likely since it is already terminated)
+                pass
+
+        atexit.register(premature_exit)
+
         # a thread is created to do blocking-read
         self.waiting += 1
 
@@ -76,21 +86,15 @@ class Group:
             self.output.put((handle, None))
             handle.stdout.close()
             handle.stdin.close()
+            # release the atexit handler now that the child has been reaped;
+            # leaving it registered would retain this handle for the life of
+            # the process (see mortoray/shelljob#14)
+            atexit.unregister(premature_exit)
             self.waiting -= 1
 
         block_thread = threading.Thread(target=block_read)
         block_thread.daemon = True
         block_thread.start()
-
-        # kill child when parent dies
-        def premature_exit():
-            try:
-                handle.terminate()
-            except Exception:
-                # who cares why, we're exiting anyway (most likely since it is already terminated)
-                pass
-
-        atexit.register(premature_exit)
 
         return handle
 
