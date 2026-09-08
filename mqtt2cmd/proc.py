@@ -113,11 +113,14 @@ class Group:
             try:
                 handle.wait()
             except Exception:
-                # Retain the handle if its exit could not be confirmed.
-                return
-
-            with _active_handles_lock:
-                _active_handles.discard(handle)
+                # The exit could not be confirmed. Drop the handle anyway:
+                # retaining it for the life of the process is precisely the
+                # unbounded growth this tracking exists to avoid, and losing
+                # the shutdown terminate for one child is the lesser harm.
+                pass
+            finally:
+                with _active_handles_lock:
+                    _active_handles.discard(handle)
 
         block_thread = threading.Thread(target=block_read)
         block_thread.daemon = True
