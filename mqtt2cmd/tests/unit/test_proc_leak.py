@@ -1,16 +1,19 @@
 """Regression tests for the atexit handler leak in proc.Group.
 
-Group._run_impl() registers an atexit handler per spawned process. The handler
-closes over the Popen handle, so leaving it registered forever retains every
-process the group has ever run. Upstream report:
+Group._run_impl() used to register an atexit handler per spawned process. The
+handler closed over the Popen handle, so leaving it registered forever retained
+every process the group had ever run. Unregistering those handlers is also not
+enough on CPython 3.10-3.13 because inactive registry entries accumulate. The
+implementation therefore uses one stable handler that tracks only live
+children. Upstream report:
 https://github.com/mortoray/shelljob/issues/14
 
 These tests deliberately avoid atexit._ncallbacks(): it is a private CPython
 counter that does not decrease on unregister before 3.14, which would make
 these tests fail on the very interpreters the service runs on. Instead they
 assert the properties that actually matter -- the handle becomes collectable
-once the child exits, and a child that outlives its output is still terminated
-at interpreter exit.
+once the child exits, process runs do not churn the atexit registry, and a child
+that outlives its output is still terminated at interpreter exit.
 """
 import gc
 import os
@@ -63,6 +66,26 @@ def test_finished_processes_become_collectable():
         "{} of {} finished Popen handles were still reachable; the atexit "
         "handler retains them for the life of the process".format(leaked, COMMANDS)
     )
+
+
+def test_process_runs_do_not_churn_atexit_registry(monkeypatch):
+    """One module-level callback must serve every process invocation."""
+    registrations = []
+    unregistrations = []
+    monkeypatch.setattr(
+        proc.atexit, "register", lambda callback: registrations.append(callback)
+    )
+    monkeypatch.setattr(
+        proc.atexit, "unregister", lambda callback: unregistrations.append(callback)
+    )
+
+    group = proc.Group()
+    for _ in range(COMMANDS):
+        group.run(["/bin/echo", "regression"])
+    _drain(group)
+
+    assert registrations == []
+    assert unregistrations == []
 
 
 def test_child_outliving_its_output_is_still_killed_at_exit():

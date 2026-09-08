@@ -12,6 +12,29 @@ import subprocess
 import threading
 
 
+_active_handles = set()
+_active_handles_lock = threading.Lock()
+
+
+def _terminate_active_handles():
+    """Terminate every child still running when the interpreter exits."""
+    with _active_handles_lock:
+        handles = list(_active_handles)
+
+    for handle in handles:
+        try:
+            handle.terminate()
+        except Exception:
+            # The process may have exited after the snapshot was taken.
+            pass
+
+
+# Keep one stable callback for the life of the interpreter.  Registering and
+# unregistering a closure for every child leaves inactive atexit registry slots
+# behind on CPython 3.10-3.13, so callback churn itself grows without bound.
+atexit.register(_terminate_active_handles)
+
+
 class CommandException(Exception):
     def __init__(self, msg):
         super(CommandException, self).__init__(msg)
@@ -62,15 +85,10 @@ class Group:
         handle.group_output_done = False
         self.handles.append(handle)
 
-        # kill child when parent dies
-        def premature_exit():
-            try:
-                handle.terminate()
-            except Exception:
-                # who cares why, we're exiting anyway (most likely since it is already terminated)
-                pass
-
-        atexit.register(premature_exit)
+        # Keep only live children in the module-level shutdown registry.  The
+        # registry's single atexit callback avoids one callback slot per run.
+        with _active_handles_lock:
+            _active_handles.add(handle)
 
         # a thread is created to do blocking-read
         self.waiting += 1
@@ -89,17 +107,17 @@ class Group:
             self.waiting -= 1
 
             # EOF on the pipe only means the child closed (or replaced) its
-            # stdout and stderr -- it may still be running. Wait for it to
-            # actually exit before releasing premature_exit, so a child that
-            # outlives its output is still terminated at interpreter exit.
-            # Only then is it safe to drop the handler; leaving it registered
-            # forever would retain this handle for the life of the process
-            # (see mortoray/shelljob#14).
+            # stdout and stderr -- it may still be running. Keep it tracked
+            # until it actually exits so the shutdown callback can terminate
+            # a child that outlives its output.
             try:
                 handle.wait()
             except Exception:
-                pass
-            atexit.unregister(premature_exit)
+                # Retain the handle if its exit could not be confirmed.
+                return
+
+            with _active_handles_lock:
+                _active_handles.discard(handle)
 
         block_thread = threading.Thread(target=block_read)
         block_thread.daemon = True
