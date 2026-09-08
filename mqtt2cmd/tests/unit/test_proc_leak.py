@@ -92,7 +92,7 @@ def test_child_outliving_its_output_is_still_killed_at_exit():
     """EOF on the pipe does not mean the child exited.
 
     A command that closes both stdout and stderr while continuing to run hits
-    EOF immediately. If the atexit handler is released at EOF rather than at
+    EOF immediately. If shutdown tracking is released at EOF rather than at
     process exit, an interpreter exit leaves the child orphaned. This runs a
     real interpreter to completion and checks the grandchild was terminated.
     """
@@ -109,15 +109,15 @@ def test_child_outliving_its_output_is_still_killed_at_exit():
         handle = group.run(
             ["sh", "-c", "exec 1>/dev/null 2>/dev/null; exec sleep 30"]
         )
-        # wait for block_read to reach EOF, so the handler would be released
-        # by any implementation that unregisters there
+        # wait for block_read to reach EOF, so shutdown tracking would be
+        # released by any implementation that treats EOF as process exit
         deadline = time.time() + 10
         while group.waiting > 0 and time.time() < deadline:
             group.readlines(timeout=0.05)
         # Group.__del__ -> close() terminates every tracked handle, which
         # would kill the child regardless of atexit and mask what is being
-        # tested. Drop the group's own tracking so ONLY premature_exit can
-        # terminate it.
+        # tested. Drop the group's own tracking so only the module-level
+        # shutdown callback can terminate it.
         group.handles.clear()
         print(handle.pid, flush=True)
         # normal interpreter exit -> atexit handlers run
@@ -147,6 +147,6 @@ def test_child_outliving_its_output_is_still_killed_at_exit():
             pass
 
     assert not alive, (
-        "child pid {} survived interpreter exit; the atexit handler was "
+        "child pid {} survived interpreter exit; shutdown tracking was "
         "released at output EOF instead of at process exit".format(pid)
     )
