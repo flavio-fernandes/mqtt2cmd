@@ -86,11 +86,20 @@ class Group:
             self.output.put((handle, None))
             handle.stdout.close()
             handle.stdin.close()
-            # release the atexit handler now that the child has been reaped;
-            # leaving it registered would retain this handle for the life of
-            # the process (see mortoray/shelljob#14)
-            atexit.unregister(premature_exit)
             self.waiting -= 1
+
+            # EOF on the pipe only means the child closed (or replaced) its
+            # stdout and stderr -- it may still be running. Wait for it to
+            # actually exit before releasing premature_exit, so a child that
+            # outlives its output is still terminated at interpreter exit.
+            # Only then is it safe to drop the handler; leaving it registered
+            # forever would retain this handle for the life of the process
+            # (see mortoray/shelljob#14).
+            try:
+                handle.wait()
+            except Exception:
+                pass
+            atexit.unregister(premature_exit)
 
         block_thread = threading.Thread(target=block_read)
         block_thread.daemon = True

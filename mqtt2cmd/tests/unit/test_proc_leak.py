@@ -44,3 +44,38 @@ def test_atexit_handlers_are_released_after_processes_finish():
             leaked, COMMANDS
         )
     )
+
+
+def test_handler_retained_while_child_outlives_its_output():
+    """EOF on the pipe does not mean the child exited.
+
+    A command that closes both stdout and stderr while continuing to run
+    reaches EOF immediately. The atexit handler must stay registered until the
+    process actually exits, otherwise an interpreter exit would leave the child
+    orphaned instead of terminating it.
+    """
+    before = atexit._ncallbacks()
+
+    group = proc.Group()
+    handle = group.run(["sh", "-c", "exec 1>/dev/null 2>/dev/null; sleep 5"])
+    try:
+        # wait for block_read to hit EOF (self.waiting drops back to zero)
+        deadline = time.time() + 10
+        while group.waiting > 0 and time.time() < deadline:
+            group.readlines(timeout=0.05)
+        time.sleep(0.3)
+
+        assert handle.poll() is None, "child should still be running after EOF"
+        assert atexit._ncallbacks() - before == 1, (
+            "atexit handler was released while the child was still running; "
+            "an interpreter exit would leave it orphaned"
+        )
+    finally:
+        handle.kill()
+        handle.wait()
+
+    # once it really exits, the handler must be released
+    deadline = time.time() + 5
+    while atexit._ncallbacks() > before and time.time() < deadline:
+        time.sleep(0.05)
+    assert atexit._ncallbacks() - before == 0, "handler not released after exit"
